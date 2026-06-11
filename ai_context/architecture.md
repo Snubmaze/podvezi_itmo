@@ -329,6 +329,25 @@ JWT-сессия Supabase, доступ к данным только через 
 | created_at | timestamptz | |
 | | CHECK | `origin_id <> destination_id`; UNIQUE(origin_id, destination_id) |
 
+#### 5.2.3 Валидация маршрута (зафиксировано на шаге 5)
+
+Решение пользователя: выбор точки отправления/назначения (ТЗ 5.5.1)
+ограничен только справочником `locations` (никакого свободного ввода адреса
+— ТЗ 5.5.2). Любая пара **различных активных** точек `locations` допустима
+— `routes` НЕ используется как ограничение при создании/поиске поездки,
+только как справочник «популярных» комбинаций для будущих подсказок/
+сортировки в UI (сейчас не реализовано). Валидация (`origin_id <>
+destination_id`, обе точки выбраны) — на клиенте
+(`services/locations.ts#validateRoutePair`) и на уровне БД (`CHECK` на
+`trips`/`routes`).
+
+**RLS:** `locations`/`routes` — справочники без персональных данных, SELECT
+открыт для `anon` и `authenticated` (миграция
+`20260611140000_locations_routes_anon_select.sql`). Причина: в dev-режиме
+(вне Telegram) активен мок-бэкенд авторизации (`services/auth.ts`) без
+реальной Supabase-сессии — запросы идут как `anon`, и без этой политики
+справочник точек был бы пуст.
+
 #### `trips`
 Поездки. Точки отправления/назначения хранятся напрямую (FK на
 `locations`); `route_id` — необязательная привязка к справочнику.
@@ -388,8 +407,9 @@ JWT-сессия Supabase, доступ к данным только через 
   `driver_verification_status` в `approved`/`rejected` (допускается лишь
   `none`/`rejected` → `pending` — подача заявки). Серверные контексты
   (`service_role` / админ / отсутствие `auth.uid()`) — без ограничений.
-- `locations`, `routes` — SELECT всем аутентифицированным; запись только
-  админ.
+- `locations`, `routes` — SELECT всем, включая анонимных (`anon`,
+  `authenticated`) — справочник без персональных данных, нужен в dev-режиме
+  без Telegram-сессии (см. 5.2.3); запись только админ.
 - `vehicles` — владелец (`driver_id = auth.uid()`) или админ.
 - `driver_documents` — ПД: SELECT/INSERT/DELETE владелец или админ;
   UPDATE (смена статуса) — только админ.
@@ -405,10 +425,43 @@ JWT-сессия Supabase, доступ к данным только через 
   пассажир (свои); UPDATE пассажир (отмена) / водитель (accept/reject) /
   админ.
 
-> Профиль другого пользователя (для отображения имени/аватара водителя в
-> списке поездок) при необходимости отдаётся через отдельную SQL-вью с
-> безопасным набором полей (без `isu_number` / `phone`) — добавляется на
-> шаге, где это потребуется (6). Сейчас RLS на `users` — строгий.
+**`trip_requests` — guard-триггер и атомарное подтверждение (шаг 6):**
+RLS на `trip_requests` не может проверить состояние связанной поездки, поэтому
+добавлен BEFORE INSERT триггер `guard_trip_requests_insert()`: блокирует заявку
+на несуществующую/неактивную поездку и заявку водителя на свою же поездку
+(понятные ошибки на русском, всплывают в `services/trips.ts#joinTrip` через
+`error.code === 'P0001'`). Подтверждение заявки водителем — три записи
+(`trip_requests.status='accepted'`, `insert trip_members`,
+`trips.seats_available--`) атомарны через RPC-функцию
+`accept_trip_request(p_request_id uuid)`, `SECURITY INVOKER` (каждая запись и
+так разрешена RLS водителю поездки/админу — лишних прав не требуется).
+Отклонение/отмена заявки — обычные `UPDATE`/`DELETE` под существующими RLS, без
+RPC. Если пассажиру отклонили/он отменил заявку — повторная заявка на ту же
+поездку невозможна (`UNIQUE(trip_id, passenger_id)`), это осознанное решение
+пользователя на шаге 6.
+
+#### `user_public_profiles` — безопасный публичный профиль (шаг 6)
+
+Для отображения имени/аватара водителя и пассажиров в списках поездок (без
+`isu_number`/`phone`/`role`) добавлена SQL-вью:
+
+```sql
+create view public.user_public_profiles as
+select id, full_name, avatar_url, course
+from public.users;
+
+grant select on public.user_public_profiles to anon, authenticated;
+```
+
+Работает за счёт дефолтного `security_invoker = false` для view (PostgreSQL
+15+): вью выполняется с правами владельца (роль миграции), который не
+ограничен RLS на `public.users`, т.к. на `users` не включён `FORCE ROW LEVEL
+SECURITY`. Наружу отдаются только 4 безопасных поля.
+
+> ⚠️ Если в будущем на `users` включат `FORCE ROW LEVEL SECURITY` — эта вью
+> перестанет отдавать чужие профили (будет видеть только свою строку), и её
+> нужно будет пересмотреть (например, переписать на `SECURITY DEFINER`
+> функцию).
 
 ### 5.3 Storage
 
@@ -422,9 +475,35 @@ JWT-сессия Supabase, доступ к данным только через 
 
 ### 5.4 Realtime
 
-- Таблицы `trips`, `trip_requests`, `trip_members` — кандидаты на
-  Supabase Realtime подписки (обновление списка поездок/заявок в
-  реальном времени).
+- Таблицы `trips`, `trip_requests`, `trip_members` добавлены в публикацию
+  `supabase_realtime` (миграция `20260611150100_realtime_publication.sql`,
+  шаг 6). Realtime уважает RLS: для `trips` (SELECT всем authenticated)
+  изменения видят все, для `trip_requests`/`trip_members` — только
+  участник/водитель поездки/админ. Хуки `useTripSearch`,
+  `useMyDriverTrips`, `useMyPassengerTrips` подписываются через
+  `supabase.channel(...).on('postgres_changes', { event: '*', schema:
+  'public', table: '...' }, () => refetch())` и делают полный refetch (без
+  точечного патчинга состояния).
+
+### 5.5 Сервисный контракт поездок (`src/services/trips.ts`, шаг 6)
+
+Все функции — `async`, при ошибке `throw new Error('сообщение по-русски')`.
+Композитные типы — `src/types/trips.ts`.
+
+| Функция | Сигнатура | Описание |
+|---|---|---|
+| `createTrip` | `(driverId: string, input: CreateTripInput) => Promise<Trip>` | Создаёт поездку (`status='active'`, `seats_available = seats_total`, `vehicle_id = null`). Валидация: маршрут (`validateRoutePair`), `seatsTotal` 1..8, `price` ≥ 0 или `null`, `departureTime` в будущем. |
+| `searchTrips` | `(filters: TripSearchFilters, excludeDriverId?: string) => Promise<TripWithRoute[]>` | Активные поездки с фильтрами по точкам/дате/времени (ТЗ 5.7). `excludeDriverId` исключает поездки этого водителя (пассажир не видит свои же поездки в поиске). Возвращает с развёрнутыми `origin`/`destination`/`driver`. |
+| `getMyDriverTrips` | `(driverId: string) => Promise<DriverTripWithDetails[]>` | Поездки водителя с заявками (`pending`) и подтверждёнными участниками (`confirmed`), для «Мои поездки» (вид водителя). |
+| `getMyPassengerTrips` | `(passengerId: string) => Promise<TripRequestWithTrip[]>` | Заявки пассажира с развёрнутой поездкой и профилем водителя, для «Мои поездки» (вид пассажира). |
+| `joinTrip` | `(passengerId: string, tripId: string) => Promise<TripRequest>` | Создаёт заявку (`status='pending'`). Ошибки: `23505` → «Вы уже подавали заявку на эту поездку»; `P0001` (guard-триггер) → текст из БД; иначе — общая ошибка. |
+| `acceptTripRequest` | `(requestId: string) => Promise<void>` | RPC `accept_trip_request` — атомарно принимает заявку, создаёт `trip_members`, уменьшает `seats_available`. |
+| `rejectTripRequest` | `(requestId: string) => Promise<void>` | `UPDATE trip_requests SET status='rejected' WHERE id=... AND status='pending'`. |
+| `cancelTripRequest` | `(requestId: string) => Promise<void>` | `DELETE FROM trip_requests WHERE id=... AND status='pending'` (отмена своей заявки пассажиром). |
+
+Отложено (вне рамок шага 6): отмена уже подтверждённого участия
+(`trip_members`, `status='cancelled'`), работа с `vehicle_id` (шаг 7),
+«поездки без водителя» (`driver_id = null`, шаг 9).
 
 ## 6. Деплой
 
@@ -445,3 +524,6 @@ JWT-сессия Supabase, доступ к данным только через 
 | 2026-06-11 | Шаг 2: миграции применяются через Supabase Management API (нет локального CLI/пароля БД); создан приватный Storage bucket `driver-documents` | Решение пользователя на шаге 2 |
 | 2026-06-11 | Шаг 3: auth-сессия из Telegram initData — через Edge Function `telegram-auth` + Admin API (детерминированные email/пароль по telegram_id); мок ITMO ID за интерфейсом `services/itmoId.ts`. Функция задеплоена через Management API, секреты `TELEGRAM_BOT_TOKEN`/`AUTH_USER_SECRET` заданы | Решение пользователя на шаге 3 |
 | 2026-06-11 | Шаг 4: активная роль — локальная (не персистится, см. 5.1.1); гейт прав водителя по `driver_verification_status=approved` (изменён RLS `trips` INSERT, убрано требование роли); добавлен триггер `guard_users_update` против self-escalation | Уточнение пользователя на шаге 4 |
+| 2026-06-11 | Шаг 5: валидация маршрута (5.2.3) — допустима любая пара различных активных `locations`; `routes` не используется как ограничение, остаётся справочником «популярных» комбинаций для будущих подсказок | Решение пользователя на шаге 5 |
+| 2026-06-11 | Шаг 5 (фикс): RLS `locations`/`routes` SELECT открыт также для `anon` (не ПД, нужно для dev-режима без Telegram-сессии) | Решение пользователя на шаге 5 |
+| 2026-06-11 | Шаг 6: вью `user_public_profiles` (5.2); guard-триггер `guard_trip_requests_insert` и RPC `accept_trip_request` на `trip_requests`/`trips`/`trip_members` (5.2.1); `trips`/`trip_members`/`trip_requests` добавлены в `supabase_realtime` (5.4); зафиксирован сервисный контракт `services/trips.ts` (5.5). Заявки пассажира идут через апрув водителя (`trip_requests` → `trip_members`), повторная заявка после отклонения/отмены заблокирована навсегда (`UNIQUE`) | Решение пользователя на шаге 6 |

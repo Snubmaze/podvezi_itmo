@@ -308,7 +308,143 @@
   «Подать заявку» — заглушка).
 - Прогон в реальном Telegram — как и для шага 3, требует HTTPS-хоста.
 
+## Шаг 5. Маршруты — выполнено
+
+Дата: 2026-06-11.
+
+### Решение по валидации (зафиксировано в `architecture.md` 5.2.3)
+
+Уточнение пользователя: выбор точки — только из справочника `locations`
+(ТЗ 5.5.2, без свободного ввода адреса). Любая пара **различных активных**
+точек допустима; `routes` НЕ используется как ограничение — остаётся
+справочником «популярных» комбинаций для будущих подсказок/сортировки в UI
+(не реализовано).
+
+### Что сделано (файлы)
+
+- `src/services/locations.ts` — `fetchLocations()` (активные `locations`,
+  сортировка по `kind`/`name`), `validateRoutePair(originId, destinationId)`
+  (обе точки выбраны и различаются).
+- `src/hooks/useLocations.ts` — хук загрузки справочника точек
+  (`locations`/`loading`/`error`).
+- `src/components/ui/select.tsx` — выпадающий список на базе
+  `@base-ui/react/select` (`Select`, `SelectTrigger`, `SelectValue`,
+  `SelectContent`, `SelectGroup`, `SelectGroupLabel`, `SelectItem`),
+  стилизован в духе `Input` (`h-11`, токены дизайн-системы).
+- `src/components/LocationPicker.tsx` — переиспользуемый выбор одной точки:
+  корпуса и общежития одним списком с группировкой и иконками
+  (`Building2`/`Home`).
+- `src/components/RouteSelector.tsx` — пара `LocationPicker` «Откуда»/«Куда»
+  + кнопка-свап + сообщение об ошибке при совпадении точек.
+- `src/pages/HomeScreen.tsx` — карточка «Поиск поездок» (роль «Пассажир»)
+  теперь показывает `RouteSelector` (загрузка/ошибка справочника точек —
+  `Spinner`/текст ошибки). Список поездок по маршруту — шаг 6.
+- Добавлены в `design_system.md`: `Select`, `LocationPicker`,
+  `RouteSelector`.
+- `npm run build` и `npm run lint` — без ошибок.
+
+### Не сделано / отложено
+
+- Подсказки/сортировка по «популярным» маршрутам из `routes` — не
+  реализованы (зафиксировано как возможное расширение в `architecture.md`
+  5.2.3).
+- Использование выбранного маршрута для поиска/создания поездок — шаг 6.
+
+### Фикс: RLS `locations`/`routes` для dev-режима
+
+При ручной проверке в браузере (без Telegram, мок-авторизация) дропдауны
+точек оказались пустыми: RLS-политики `locations_select_all` /
+`routes_select_all` (шаг 2) разрешали SELECT только `authenticated`, а в
+dev-режиме нет реальной Supabase-сессии → запросы шли как `anon` и
+возвращали `[]` (проверено через REST API с anon-ключом).
+
+- Решение пользователя: `locations`/`routes` не содержат персональных
+  данных → SELECT открыт также для `anon`.
+- Миграция `supabase/migrations/20260611140000_locations_routes_anon_select.sql`
+  (пересоздаёт обе политики с `to anon, authenticated`).
+- `architecture.md` 5.2.1/5.2.3 обновлены.
+- **Применена** к Supabase-проекту (`ythaejxeaekgxtivqaqp`) через
+  Management API (PAT использован разово, не сохранён). Проверено:
+  `pg_policies` — `locations_select_all`/`routes_select_all` теперь
+  `roles = {anon,authenticated}`; REST-запрос `locations` с anon-ключом
+  возвращает данные.
+
+## Шаг 6. Создание и поиск поездок — выполнено
+
+Дата: 2026-06-11.
+
+### Решения (зафиксированы в `architecture.md` 5.2/5.2.1/5.4/5.5)
+
+- **Заявки пассажира идут через апрув водителя** (уточнение пользователя):
+  `trip_requests` (status=`pending`) → водитель принимает/отклоняет; при
+  принятии **атомарно** (RPC `accept_trip_request`, `SECURITY INVOKER`):
+  `trip_requests.status='accepted'` + `insert trip_members` (confirmed) +
+  `trips.seats_available--`.
+- **Безопасный публичный профиль** — вью `user_public_profiles` (`id,
+  full_name, avatar_url, course`), `security_invoker=false`, `grant select`
+  для `anon, authenticated` — для отображения водителя/пассажиров в списках.
+- **Guard-триггер** `guard_trip_requests_insert` (BEFORE INSERT на
+  `trip_requests`): блокирует заявку на несуществующую/неактивную поездку и
+  заявку водителя на свою поездку.
+- **Повторная заявка после отклонения/отмены — заблокирована навсегда**
+  (решение пользователя): используется существующий `UNIQUE(trip_id,
+  passenger_id)` как есть; `joinTrip` ловит `23505` →
+  «Вы уже подавали заявку на эту поездку».
+- **Realtime**: `trips`, `trip_members`, `trip_requests` добавлены в
+  публикацию `supabase_realtime` (RLS уважается).
+- `vehicle_id` в `trips` остаётся `NULL` (появится на шаге 7).
+
+### Что сделано (файлы)
+
+- Миграции:
+  - `supabase/migrations/20260611150000_trip_requests_and_profiles.sql` —
+    вью `user_public_profiles`, триггер `guard_trip_requests_insert`, RPC
+    `accept_trip_request`.
+  - `supabase/migrations/20260611150100_realtime_publication.sql` —
+    `trips`/`trip_members`/`trip_requests` в `supabase_realtime`.
+- Типы: `src/types/db.ts` (добавлен `UserPublicProfile`), новый
+  `src/types/trips.ts` (`TripWithRoute`, `TripRequestWithTrip`,
+  `TripRequestWithPassenger`, `TripMemberWithPassenger`,
+  `DriverTripWithDetails`, `TripSearchFilters`, `CreateTripInput`).
+- Хелперы `src/lib/`: `datetime.ts` (формат даты/времени, границы суток,
+  без внешних библиотек), `tripStatus.ts`, `tripRequestStatus.ts` (бейджи
+  статусов поездки/заявки).
+- `src/services/trips.ts` — `createTrip`, `searchTrips`,
+  `getMyDriverTrips`, `getMyPassengerTrips`, `joinTrip`,
+  `acceptTripRequest`, `rejectTripRequest`, `cancelTripRequest` (контракт —
+  `architecture.md` 5.5).
+- Хуки: `useTripSearch`, `useMyDriverTrips`, `useMyPassengerTrips` (паттерн
+  `useLocations` + realtime-подписка → `refetch()`).
+- Компоненты: `src/components/TripCard.tsx` (карточка поездки: маршрут,
+  дата/время, места, цена, водитель, слоты `badge`/`footer`),
+  `src/components/TripSearchFilterBar.tsx` (фильтры дата/время).
+- Экраны: `src/pages/TripCreateScreen.tsx` (создание поездки, экран 6.7),
+  `src/pages/MyTripsScreen.tsx` (экран 6.6/6.8 — «Мои поездки» для
+  водителя и пассажира).
+- `src/app/AuthenticatedApp.tsx` — добавлены `View` `'trip-create'` /
+  `'my-trips'`, `activeRole` поднят сюда (передаётся в `HomeScreen` и
+  `MyTripsScreen`).
+- `src/pages/HomeScreen.tsx` — главный экран водителя (6.6): «Создать
+  поездку», «Мои поездки», «Поездки без водителя» (заглушка, шаг 9);
+  главный экран пассажира (6.8): `RouteSelector` + `TripSearchFilterBar` +
+  список `TripCard` с кнопкой «Присоединиться» (`joinTrip`) + кнопка «Мои
+  поездки».
+- `npm run build` и `npm run lint` — без ошибок.
+
+### Что НЕ сделано (намеренно, отложено)
+
+- Отмена уже подтверждённого участия (`trip_members.status='cancelled'`) —
+  вне рамок шага 6.
+- `vehicle_id` в `trips` — шаг 7 (регистрация авто водителя).
+- «Поездки без водителя» (`driver_id = null`) — шаг 9, на главном экране
+  водителя пока заглушка-кнопка (disabled).
+- Применение миграций к Supabase-проекту и ручная end-to-end проверка
+  (создание поездки, заявка, принятие/отклонение, realtime) — выполняется
+  пользователем через SQL Editor (PAT через Bash заблокирован
+  классификатором auto-режима как утечка кредов).
+
 ## Следующий шаг
 
-**Шаг 5: Справочник маршрутов** — UI/логика работы с `locations`/`routes`,
-выбор маршрута. См. `claude_code_promts.md`, Часть 5.
+**Шаг 7: Регистрация и верификация водителя** — подача заявки на роль
+водителя, данные автомобиля (`vehicles`), загрузка документов
+(`driver_documents`), статусы верификации.

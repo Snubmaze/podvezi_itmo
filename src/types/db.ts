@@ -153,3 +153,15 @@ export interface TripRequest {
   created_at: string
   updated_at: string
 }
+
+/**
+ * Безопасный публичный профиль пользователя (вью `user_public_profiles`,
+ * шаг 6) — без ИСУ/телефона/роли, для отображения водителя/пассажиров в
+ * списках поездок.
+ */
+export interface UserPublicProfile {
+  id: string
+  full_name: string | null
+  avatar_url: string | null
+  course: number | null
+}

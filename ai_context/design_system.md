@@ -118,6 +118,7 @@ Telegram themes).
 | `Label` | `ui/label.tsx` | подпись к полю формы |
 | `Spinner` | `ui/spinner.tsx` | индикатор загрузки (lucide `Loader2`, `animate-spin`) |
 | `Badge` | `ui/badge.tsx` | бейдж статуса (variant: primary/success/warning/danger/neutral — статусные токены) |
+| `Select` | `ui/select.tsx` | выпадающий список на базе `@base-ui/react/select` (`Select`, `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectGroup`, `SelectGroupLabel`, `SelectItem`); триггер `h-11` как у `Input` |
 
 Композиционные компоненты `src/components/`:
 
@@ -128,9 +129,18 @@ Telegram themes).
 | `Avatar` | `Avatar.tsx` | аватар с буквенным фолбэком (размер через `className`) |
 | `Modal` | `Modal.tsx` | модалка/боттом-шит (оверлей `bg-black/40`, карточка, Esc/клик-вне) |
 | `RoleSwitcher` | `RoleSwitcher.tsx` | переключатель активной роли (Пассажир/Водитель-с-замком) |
+| `LocationPicker` | `LocationPicker.tsx` | выбор одной точки маршрута (`Select`): корпуса/общежития сгруппированы, иконки `Building2`/`Home`; выбор только из справочника `locations` |
+| `RouteSelector` | `RouteSelector.tsx` | пара `LocationPicker` «Откуда»/«Куда» + кнопка-свап (`ArrowUpDown`) + сообщение об ошибке, если точки совпадают |
+| `TripCard` | `TripCard.tsx` | карточка поездки: маршрут (`origin → destination`, иконка `ArrowRight`), дата/время, места, цена, опционально водитель (`showDriver`), слот `badge` (статус) и `footer` (действия) |
+| `TripSearchFilterBar` | `TripSearchFilterBar.tsx` | фильтры поиска поездок — `Input type="date"`/`type="time"` («Дата» / «Время от»), второе поле заблокировано, пока не выбрана дата |
 
 Статус верификации водителя → бейдж: хелпер `src/lib/verification.ts`
-(`verificationBadge(status)` → `{ label, variant }`).
+(`verificationBadge(status)` → `{ label, variant }`). По аналогии для
+поездок — `src/lib/tripStatus.ts` (`tripStatusBadge(status)`) и заявок на
+участие — `src/lib/tripRequestStatus.ts` (`tripRequestStatusBadge(status)`).
+Форматирование даты/времени поездки и хелперы для фильтров — `src/lib/datetime.ts`
+(`formatTripDate`, `formatTripTime`, `combineDateTimeToISO`, `nowIso`,
+`startOfDayISO`, `startOfNextDayISO`); без внешних библиотек дат.
 
 **Паттерн формы** (экраны регистрации / входа ITMO ID): `Label` + `Input`
 с `aria-invalid`, текст ошибки — `text-sm text-danger-foreground`;
