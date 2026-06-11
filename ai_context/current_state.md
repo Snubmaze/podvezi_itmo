@@ -214,8 +214,54 @@
   tsconfig (strict, `verbatimModuleSyntax`), но требует проверки
   `npm install && npm run build` и прогон `npm run dev` на машине с сетью.
 
+## Шаг 3 (часть 3b). Реальная Telegram-авторизация — выполнено
+
+Дата: 2026-06-11.
+
+### Что сделано (файлы)
+
+- `supabase/functions/telegram-auth/index.ts` — Edge Function (Deno):
+  проверка HMAC-подписи initData bot-token'ом, проверка `auth_date`
+  (24ч), создание/поиск `auth.users` (детерминированные email
+  `tg<telegram_id>@telegram.podvezi.local` и пароль =
+  HMAC(`AUTH_USER_SECRET`, telegram_id)), `signInWithPassword`, upsert
+  строки `public.users`, возврат `{ access_token, refresh_token,
+  is_new_user }`. CORS включён.
+- `src/lib/telegram.ts` — добавлены `isTelegramEnv()` и
+  `getInitDataRaw()` (через `retrieveRawInitData` из SDK).
+- `src/services/auth.ts` — добавлена Supabase-реализация `AuthBackend`
+  (`authenticate` через `functions.invoke('telegram-auth')` +
+  `auth.setSession` + чтение `public.users`; `updateProfile` через
+  `from('users').update` под RLS; `signOut`). Выбор backend:
+  `isTelegramEnv() ? supabase : mock` — в Telegram реальная авторизация,
+  в браузере (дев/демо) мок.
+
+### Деплой и проверка
+
+- Секреты Edge Function заданы через Management API:
+  `TELEGRAM_BOT_TOKEN`, `AUTH_USER_SECRET` (случайный, хранится только в
+  секретах Supabase). Авто-инжект `SUPABASE_URL` /
+  `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_ANON_KEY`.
+- Функция задеплоена через Management API (`POST /functions/deploy`,
+  `verify_jwt = false`), статус ACTIVE.
+- Проверено end-to-end (curl + подписанный initData):
+  невалидная подпись → 401; без `initDataRaw` → 400; OPTIONS → 200 (CORS);
+  валидный initData → 200 c access/refresh, `is_new_user: true`, затем
+  повторно `false` (идемпотентность); строки в `auth.users` и
+  `public.users` создаются; каскадное удаление работает. Тестовый
+  пользователь удалён.
+- Frontend: `npm run build` и `npm run lint` — без ошибок.
+
+### Не проверено (требует устройства)
+
+- Реальный клиентский флоу внутри Telegram (`retrieveRawInitData` +
+  `functions.invoke` + `setSession`) — нужно открыть Mini App из бота на
+  HTTPS-хосте (Vercel/туннель). Логика бэкенда уже подтверждена.
+- `AUTH_USER_SECRET` хранится только в Supabase. Его смена инвалидирует
+  детерминированные пароли существующих пользователей (сейчас их нет).
+
 ## Следующий шаг
 
-**Шаг 3, часть 3b** — реальная Telegram-авторизация: Edge Function
-`telegram-auth` (+ секреты через Management API), Supabase-реализация
-`AuthBackend`, запись `public.users`. См. `architecture.md` 5.1.
+**Шаг 4: Роли и профиль** — экран профиля (ФИО/курс/возраст/аватар из
+ITMO ID — нередактируемые; «Описание» 5.8 — редактируемое), базовые роли.
+См. `claude_code_promts.md`, Часть 4.

@@ -10,6 +10,8 @@
  * сигнатуры интерфейса. Точка замены — экспорт `authBackend` внизу файла.
  */
 
+import { supabase } from '@/lib/supabase'
+import { getInitDataRaw, isTelegramEnv } from '@/lib/telegram'
 import type { User } from '@/types/db'
 
 export interface AuthBackend {
@@ -92,8 +94,81 @@ function createMockAuthBackend(): AuthBackend {
   }
 }
 
+// --- Supabase-реализация (шаг 3b) ----------------------------------------
+
+interface TelegramAuthResponse {
+  access_token: string
+  refresh_token: string
+  is_new_user: boolean
+}
+
+function createSupabaseAuthBackend(): AuthBackend {
+  return {
+    async authenticate() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      let activeSession = session
+
+      if (!activeSession) {
+        const initDataRaw = getInitDataRaw()
+        if (!initDataRaw) {
+          throw new Error('Откройте приложение из Telegram')
+        }
+        const { data, error } = await supabase.functions.invoke<TelegramAuthResponse>(
+          'telegram-auth',
+          { body: { initDataRaw } },
+        )
+        if (error || !data) {
+          throw new Error('Не удалось авторизоваться через Telegram')
+        }
+        const { data: setData, error: setError } = await supabase.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        })
+        if (setError || !setData.session) {
+          throw new Error('Не удалось установить сессию')
+        }
+        activeSession = setData.session
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', activeSession.user.id)
+        .single()
+      if (profileError || !profile) {
+        throw new Error('Не удалось загрузить профиль')
+      }
+      return profile as User
+    },
+
+    async updateProfile(patch) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) throw new Error('Нет активной сессии')
+
+      const { data, error } = await supabase
+        .from('users')
+        .update(patch)
+        .eq('id', user.id)
+        .select()
+        .single()
+      if (error || !data) throw new Error('Не удалось обновить профиль')
+      return data as User
+    },
+
+    async signOut() {
+      await supabase.auth.signOut()
+    },
+  }
+}
+
 /**
  * Активный backend авторизации.
- * Шаг 3b заменит мок на Supabase-реализацию здесь.
+ * В Telegram — реальная Supabase-реализация; в браузере (дев/демо) — мок.
  */
-export const authBackend: AuthBackend = createMockAuthBackend()
+export const authBackend: AuthBackend = isTelegramEnv()
+  ? createSupabaseAuthBackend()
+  : createMockAuthBackend()

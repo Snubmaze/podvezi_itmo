@@ -24,20 +24,19 @@
 Справочники засидированы (5 корпусов, 5 общежитий, 50 маршрутов). Детали —
 в `current_state.md` и `architecture.md` (раздел 5.2).
 
-## 3. Telegram-авторизация, регистрация (номер ИСУ) и мок ITMO ID — **в работе**
-
-Разбит на части:
+## 3. Telegram-авторизация, регистрация (номер ИСУ) и мок ITMO ID — **готово**
 
 - **3a — готово**: весь UI-флоу на мок-провайдере авторизации (экраны
   Splash 6.1, регистрация ИСУ 6.2, мок-вход ITMO ID, заглушка главного
   экрана), `services/itmoId.ts`, `services/auth.ts` (интерфейс +
-  мок-реализация), `AuthProvider`/`useAuth`/`AppFlow`. Детали —
-  `current_state.md`.
-- **3b — в работе (следующее)**: Edge Function `telegram-auth` (проверка
-  HMAC initData + Admin API), Supabase-реализация `AuthBackend`, запись
-  `public.users`, секреты Edge Function. Стратегия — `architecture.md` 5.1.
+  мок-реализация), `AuthProvider`/`useAuth`/`AppFlow`.
+- **3b — готово**: Edge Function `telegram-auth` (проверка HMAC initData +
+  Admin API, задеплоена, проверена end-to-end), Supabase-реализация
+  `AuthBackend`, запись `public.users`, секреты через Management API.
+  Остаётся прогон клиентского флоу в Telegram на устройстве. Детали —
+  `current_state.md`, стратегия — `architecture.md` 5.1.
 
-## 4. Роли и профиль — не начато
+## 4. Роли и профиль — **в работе**
 
 Профиль пользователя, базовые роли (пассажир/водитель/админ), экран
 профиля.
