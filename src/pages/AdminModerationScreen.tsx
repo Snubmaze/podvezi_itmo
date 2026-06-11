@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 
 import { AppScreen } from '@/components/AppScreen'
+import { ImageLightbox } from '@/components/ImageLightbox'
 import { Modal } from '@/components/Modal'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -13,7 +14,13 @@ import {
 } from '@/services/moderation'
 import type { DriverApplicationReview, ReviewDocument } from '@/types/moderation'
 
-function DocThumb({ doc }: { doc: ReviewDocument }) {
+function DocThumb({
+  doc,
+  onOpen,
+}: {
+  doc: ReviewDocument
+  onOpen: (doc: ReviewDocument, label: string) => void
+}) {
   const label = `${doc.type === 'license' ? 'ВУ' : 'СТС'} · ${
     doc.side === 'front' ? 'лицевая' : doc.side === 'back' ? 'задняя' : '—'
   }`
@@ -21,13 +28,13 @@ function DocThumb({ doc }: { doc: ReviewDocument }) {
     <div className="space-y-1">
       <p className="text-xs text-muted-foreground">{label}</p>
       {doc.url ? (
-        <a href={doc.url} target="_blank" rel="noreferrer">
+        <button type="button" onClick={() => onOpen(doc, label)} className="block w-full">
           <img
             src={doc.url}
             alt={label}
             className="aspect-[3/2] w-full rounded-lg border border-border object-cover"
           />
-        </a>
+        </button>
       ) : (
         <div className="flex aspect-[3/2] w-full items-center justify-center rounded-lg border border-border bg-muted text-xs text-tertiary">
           нет фото
@@ -57,6 +64,7 @@ function ApplicationCard({
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [preview, setPreview] = useState<{ url: string; label: string } | null>(null)
 
   const { applicant, vehicle } = review
 
@@ -117,7 +125,11 @@ function ApplicationCard({
 
       <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3">
         {review.documents.map((doc) => (
-          <DocThumb key={doc.id} doc={doc} />
+          <DocThumb
+            key={doc.id}
+            doc={doc}
+            onOpen={(d, label) => d.url && setPreview({ url: d.url, label })}
+          />
         ))}
       </div>
 
@@ -161,6 +173,12 @@ function ApplicationCard({
           </Button>
         </div>
       </Modal>
+
+      <ImageLightbox
+        src={preview?.url ?? null}
+        alt={preview?.label ?? ''}
+        onClose={() => setPreview(null)}
+      />
     </div>
   )
 }

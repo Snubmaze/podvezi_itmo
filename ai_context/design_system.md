@@ -128,6 +128,7 @@ Telegram themes).
 | `BrandMark` | `BrandMark.tsx` | логотип сервиса (иконка авто в фирменном квадрате) |
 | `Avatar` | `Avatar.tsx` | аватар с буквенным фолбэком (размер через `className`) |
 | `Modal` | `Modal.tsx` | модалка/боттом-шит (оверлей `bg-black/40`, карточка, Esc/клик-вне) |
+| `ImageLightbox` | `ImageLightbox.tsx` | полноэкранный просмотр фото внутри приложения (оверлей `bg-black/90`, `object-contain`, кнопка закрытия, Esc/клик-вне) — для документов модерации и т.п., вместо открытия в браузере |
 | `RoleSwitcher` | `RoleSwitcher.tsx` | переключатель активной роли (Пассажир/Водитель-с-замком) |
 | `LocationPicker` | `LocationPicker.tsx` | выбор одной точки маршрута (`Select`): корпуса/общежития сгруппированы, иконки `Building2`/`Home`; выбор только из справочника `locations` |
 | `RouteSelector` | `RouteSelector.tsx` | пара `LocationPicker` «Откуда»/«Куда» + кнопка-свап (`ArrowUpDown`) + сообщение об ошибке, если точки совпадают |

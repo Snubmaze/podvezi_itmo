@@ -13,6 +13,25 @@ import type { User } from '@/types/db'
 /** Цвет — только буквы (кириллица/латиница), пробелы и дефис. */
 const COLOR_PATTERN = /^[A-Za-zА-Яа-яЁё\s-]+$/
 
+/** Допустимые форматы фото документов (ВУ/СТС). */
+const ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'heic', 'heif', 'webp']
+const ALLOWED_IMAGE_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/heic',
+  'image/heif',
+  'image/webp',
+]
+const ALLOWED_IMAGE_ACCEPT = `${ALLOWED_IMAGE_TYPES.join(',')},.heic,.heif`
+const ALLOWED_IMAGE_ERROR = 'Поддерживаются форматы JPG, PNG, HEIC, HEIF, WEBP'
+
+/** HEIC/HEIF на части браузеров приходят без MIME-типа — проверяем и расширение файла. */
+function isAllowedImageFile(file: File): boolean {
+  if (ALLOWED_IMAGE_TYPES.includes(file.type)) return true
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  return !!ext && ALLOWED_IMAGE_EXTENSIONS.includes(ext)
+}
+
 /** Поле загрузки фото документа. */
 function FileField({
   id,
@@ -25,6 +44,18 @@ function FileField({
   file: File | null
   onChange: (file: File | null) => void
 }) {
+  const [fileError, setFileError] = useState<string | null>(null)
+
+  const handleFileChange = (selected: File | null) => {
+    if (selected && !isAllowedImageFile(selected)) {
+      setFileError(ALLOWED_IMAGE_ERROR)
+      onChange(null)
+      return
+    }
+    setFileError(null)
+    onChange(selected)
+  }
+
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
@@ -47,10 +78,11 @@ function FileField({
       <input
         id={id}
         type="file"
-        accept="image/*"
+        accept={ALLOWED_IMAGE_ACCEPT}
         className="sr-only"
-        onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+        onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
       />
+      {fileError && <p className="text-xs text-danger-foreground">{fileError}</p>}
     </div>
   )
 }
