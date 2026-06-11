@@ -15,14 +15,15 @@ import type {
 
 const DOCUMENTS_BUCKET = 'driver-documents'
 
-/** Загружает файл документа в приватный bucket, возвращает путь. */
+/** Загружает фото документа (сторона front/back) в приватный bucket. */
 async function uploadDocument(
   userId: string,
   type: DocumentType,
+  side: 'front' | 'back',
   file: File,
 ): Promise<string> {
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-  const path = `${userId}/${type}/${Date.now()}.${ext}`
+  const path = `${userId}/${type}/${side}_${Date.now()}.${ext}`
   const { error } = await supabase.storage
     .from(DOCUMENTS_BUCKET)
     .upload(path, file, { upsert: false })
@@ -45,8 +46,10 @@ export async function submitDriverVerification(
     return
   }
 
-  const licensePath = await uploadDocument(userId, 'license', input.licenseFile)
-  const stsPath = await uploadDocument(userId, 'sts', input.stsFile)
+  const licenseFront = await uploadDocument(userId, 'license', 'front', input.licenseFrontFile)
+  const licenseBack = await uploadDocument(userId, 'license', 'back', input.licenseBackFile)
+  const stsFront = await uploadDocument(userId, 'sts', 'front', input.stsFrontFile)
+  const stsBack = await uploadDocument(userId, 'sts', 'back', input.stsBackFile)
 
   const { data: vehicle, error: vehicleError } = await supabase
     .from('vehicles')
@@ -65,8 +68,10 @@ export async function submitDriverVerification(
   }
 
   const { error: documentsError } = await supabase.from('driver_documents').insert([
-    { driver_id: userId, document_type: 'license', file_path: licensePath },
-    { driver_id: userId, document_type: 'sts', file_path: stsPath },
+    { driver_id: userId, document_type: 'license', file_path: licenseFront },
+    { driver_id: userId, document_type: 'license', file_path: licenseBack },
+    { driver_id: userId, document_type: 'sts', file_path: stsFront },
+    { driver_id: userId, document_type: 'sts', file_path: stsBack },
   ])
   if (documentsError) throw new Error('Не удалось сохранить документы')
 

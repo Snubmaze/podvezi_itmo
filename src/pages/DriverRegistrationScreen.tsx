@@ -10,6 +10,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { submitDriverVerification } from '@/services/driver'
 import type { User } from '@/types/db'
 
+/** Цвет — только буквы (кириллица/латиница), пробелы и дефис. */
+const COLOR_PATTERN = /^[A-Za-zА-Яа-яЁё\s-]+$/
+
 /** Поле загрузки фото документа. */
 function FileField({
   id,
@@ -71,8 +74,10 @@ export function DriverRegistrationScreen({
   const [plate, setPlate] = useState('')
   const [color, setColor] = useState('')
   const [seats, setSeats] = useState('4')
-  const [licenseFile, setLicenseFile] = useState<File | null>(null)
-  const [stsFile, setStsFile] = useState<File | null>(null)
+  const [licenseFront, setLicenseFront] = useState<File | null>(null)
+  const [licenseBack, setLicenseBack] = useState<File | null>(null)
+  const [stsFront, setStsFront] = useState<File | null>(null)
+  const [stsBack, setStsBack] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -83,12 +88,20 @@ export function DriverRegistrationScreen({
       setError('Заполните марку, модель и госномер')
       return
     }
+    if (!color.trim()) {
+      setError('Укажите цвет автомобиля')
+      return
+    }
+    if (!COLOR_PATTERN.test(color.trim())) {
+      setError('Цвет — только буквы (без цифр)')
+      return
+    }
     if (!Number.isInteger(seatsNum) || seatsNum < 1 || seatsNum > 8) {
       setError('Число мест — от 1 до 8')
       return
     }
-    if (!licenseFile || !stsFile) {
-      setError('Загрузите фото водительского удостоверения и СТС')
+    if (!licenseFront || !licenseBack || !stsFront || !stsBack) {
+      setError('Загрузите обе стороны ВУ и СТС (4 фото)')
       return
     }
     setError(null)
@@ -98,10 +111,12 @@ export function DriverRegistrationScreen({
         make: make.trim(),
         model: model.trim(),
         plateNumber: plate.trim(),
-        color: color.trim() || null,
+        color: color.trim(),
         seatsCount: seatsNum,
-        licenseFile,
-        stsFile,
+        licenseFrontFile: licenseFront,
+        licenseBackFile: licenseBack,
+        stsFrontFile: stsFront,
+        stsBackFile: stsBack,
       })
       await reloadUser()
       onSubmitted()
@@ -160,7 +175,7 @@ export function DriverRegistrationScreen({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label htmlFor="color">Цвет (необязательно)</Label>
+            <Label htmlFor="color">Цвет</Label>
             <Input
               id="color"
               placeholder="Белый"
@@ -183,16 +198,28 @@ export function DriverRegistrationScreen({
         </div>
 
         <FileField
-          id="license"
-          label="Фото водительского удостоверения"
-          file={licenseFile}
-          onChange={setLicenseFile}
+          id="license-front"
+          label="ВУ — лицевая сторона"
+          file={licenseFront}
+          onChange={setLicenseFront}
         />
         <FileField
-          id="sts"
-          label="Фото СТС"
-          file={stsFile}
-          onChange={setStsFile}
+          id="license-back"
+          label="ВУ — задняя сторона"
+          file={licenseBack}
+          onChange={setLicenseBack}
+        />
+        <FileField
+          id="sts-front"
+          label="СТС — лицевая сторона"
+          file={stsFront}
+          onChange={setStsFront}
+        />
+        <FileField
+          id="sts-back"
+          label="СТС — задняя сторона"
+          file={stsBack}
+          onChange={setStsBack}
         />
 
         {error && <p className="text-sm text-danger-foreground">{error}</p>}

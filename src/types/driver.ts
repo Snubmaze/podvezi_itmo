@@ -5,10 +5,12 @@ export interface DriverApplicationInput {
   make: string
   model: string
   plateNumber: string
-  color: string | null
+  color: string
   seatsCount: number
-  licenseFile: File
-  stsFile: File
+  licenseFrontFile: File
+  licenseBackFile: File
+  stsFrontFile: File
+  stsBackFile: File
 }
 
 /** Краткая сводка последней заявки на верификацию (для статуса/причины). */
