@@ -114,8 +114,10 @@ Telegram themes).
 |---|---|---|
 | `Button` | `ui/button.tsx` | кнопки (variant: default/outline/secondary/ghost/destructive/link; size: xs/sm/default/lg/icon\*) |
 | `Input` | `ui/input.tsx` | текстовые поля (`h-11`, mobile-friendly), `aria-invalid` для ошибок |
+| `Textarea` | `ui/textarea.tsx` | многострочное поле (напр. «Описание» профиля) |
 | `Label` | `ui/label.tsx` | подпись к полю формы |
 | `Spinner` | `ui/spinner.tsx` | индикатор загрузки (lucide `Loader2`, `animate-spin`) |
+| `Badge` | `ui/badge.tsx` | бейдж статуса (variant: primary/success/warning/danger/neutral — статусные токены) |
 
 Композиционные компоненты `src/components/`:
 
@@ -123,6 +125,12 @@ Telegram themes).
 |---|---|---|
 | `AppScreen` | `AppScreen.tsx` | мобильный layout экрана (центр. колонка `max-w-md`, отступы) |
 | `BrandMark` | `BrandMark.tsx` | логотип сервиса (иконка авто в фирменном квадрате) |
+| `Avatar` | `Avatar.tsx` | аватар с буквенным фолбэком (размер через `className`) |
+| `Modal` | `Modal.tsx` | модалка/боттом-шит (оверлей `bg-black/40`, карточка, Esc/клик-вне) |
+| `RoleSwitcher` | `RoleSwitcher.tsx` | переключатель активной роли (Пассажир/Водитель-с-замком) |
+
+Статус верификации водителя → бейдж: хелпер `src/lib/verification.ts`
+(`verificationBadge(status)` → `{ label, variant }`).
 
 **Паттерн формы** (экраны регистрации / входа ITMO ID): `Label` + `Input`
 с `aria-invalid`, текст ошибки — `text-sm text-danger-foreground`;

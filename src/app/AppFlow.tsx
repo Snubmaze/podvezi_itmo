@@ -1,6 +1,6 @@
+import { AuthenticatedApp } from '@/app/AuthenticatedApp'
 import { useAuth } from '@/hooks/useAuth'
 import { ItmoIdLoginScreen } from '@/pages/ItmoIdLoginScreen'
-import { PassengerHomeScreen } from '@/pages/PassengerHomeScreen'
 import { RegistrationScreen } from '@/pages/RegistrationScreen'
 import { SplashScreen } from '@/pages/SplashScreen'
 
@@ -28,5 +28,5 @@ export function AppFlow() {
   if (!user.itmo_id_linked) {
     return <ItmoIdLoginScreen />
   }
-  return <PassengerHomeScreen user={user} />
+  return <AuthenticatedApp user={user} />
 }
