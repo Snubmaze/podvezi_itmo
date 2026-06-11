@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ChevronLeft } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ChevronLeft, LogOut } from 'lucide-react'
 
 import { AppScreen } from '@/components/AppScreen'
 import { Avatar } from '@/components/Avatar'
@@ -10,6 +10,8 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/hooks/useAuth'
 import { verificationBadge } from '@/lib/verification'
+import { devSetMockDriverStatus } from '@/services/auth'
+import { getDriverApplication } from '@/services/driver'
 import type { User } from '@/types/db'
 
 /** Строка «только для чтения» (данные из ITMO ID / Telegram). */
@@ -29,11 +31,26 @@ export function ProfileScreen({
   user: User
   onBack: () => void
 }) {
-  const { updateDescription, signOut } = useAuth()
+  const { updateDescription, signOut, retry } = useAuth()
   const [description, setDescription] = useState(user.description ?? '')
   const [saving, setSaving] = useState(false)
   const dirty = description !== (user.description ?? '')
   const badge = verificationBadge(user.driver_verification_status)
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null)
+
+  // Причина отклонения (если админ её указал — шаг 8).
+  useEffect(() => {
+    if (user.driver_verification_status !== 'rejected') return
+    let active = true
+    getDriverApplication(user.id)
+      .then((app) => {
+        if (active && app?.comment) setRejectionReason(app.comment)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [user.driver_verification_status, user.id])
 
   const handleSave = async () => {
     setSaving(true)
@@ -67,6 +84,11 @@ export function ProfileScreen({
           <div className="mt-1.5 flex justify-center">
             <Badge variant={badge.variant}>{badge.label}</Badge>
           </div>
+          {user.driver_verification_status === 'rejected' && rejectionReason && (
+            <p className="mt-2 text-sm text-danger-foreground">
+              Причина: {rejectionReason}
+            </p>
+          )}
         </div>
       </div>
 
@@ -108,16 +130,33 @@ export function ProfileScreen({
         </Button>
       </div>
 
-      {import.meta.env.DEV && (
+      <div className="mt-auto space-y-2 pt-6">
+        {import.meta.env.DEV && (
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full"
+            onClick={() => {
+              const isApproved = user.driver_verification_status === 'approved'
+              devSetMockDriverStatus(isApproved ? 'none' : 'approved')
+              retry()
+            }}
+          >
+            {user.driver_verification_status === 'approved'
+              ? 'Снять статус водителя (дев)'
+              : 'Стать водителем (дев)'}
+          </Button>
+        )}
         <Button
           variant="ghost"
-          size="sm"
-          className="mt-auto self-center text-muted-foreground"
+          size="lg"
+          className="w-full text-destructive"
           onClick={() => void signOut()}
         >
-          Сбросить сессию (дев)
+          <LogOut className="size-4" />
+          Выйти
         </Button>
-      )}
+      </div>
     </AppScreen>
   )
 }

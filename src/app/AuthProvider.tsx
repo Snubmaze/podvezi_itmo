@@ -66,6 +66,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applyPatch],
   )
 
+  // Перечитать профиль без флажка loading (после изменений вне updateProfile,
+  // напр. подачи заявки на верификацию через services/driver.ts).
+  const reloadUser = useCallback(async () => {
+    const user = await authBackend.authenticate()
+    setState({ status: 'ready', user })
+  }, [])
+
   const signOut = useCallback(async () => {
     await authBackend.signOut()
     setState({ status: 'loading' })
@@ -80,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsuNumber,
         linkItmoId,
         updateDescription,
+        reloadUser,
         signOut,
       }}
     >

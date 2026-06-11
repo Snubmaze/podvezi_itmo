@@ -18,6 +18,8 @@ export interface AuthContextValue {
   linkItmoId: (profile: ItmoIdProfile) => Promise<void>
   /** Обновить редактируемое поле «Описание» (ТЗ 5.8). */
   updateDescription: (description: string) => Promise<void>
+  /** Перечитать профиль из источника (после подачи заявки на верификацию и т.п.). */
+  reloadUser: () => Promise<void>
   /** Сбросить сессию (дев-режим / повторное прохождение флоу). */
   signOut: () => Promise<void>
 }

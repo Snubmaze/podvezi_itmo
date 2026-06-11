@@ -12,7 +12,7 @@
 
 import { supabase } from '@/lib/supabase'
 import { getInitDataRaw, isTelegramEnv } from '@/lib/telegram'
-import type { User } from '@/types/db'
+import type { DriverVerificationStatus, User } from '@/types/db'
 
 export interface AuthBackend {
   /** Boot/авторизация: вернуть текущего пользователя (создав при первом входе). */
@@ -92,6 +92,21 @@ function createMockAuthBackend(): AuthBackend {
       localStorage.removeItem(MOCK_STORAGE_KEY)
     },
   }
+}
+
+/**
+ * DEV-only: подменяет статус верификации мок-пользователя в localStorage,
+ * чтобы локально прокликать водительский флоу без Telegram/админа.
+ * В Supabase-режиме статус ставит только админ (см. architecture.md 5.1.1).
+ */
+export function devSetMockDriverStatus(status: DriverVerificationStatus): void {
+  const user = loadStoredUser()
+  if (!user) return
+  storeUser({
+    ...user,
+    driver_verification_status: status,
+    updated_at: new Date().toISOString(),
+  })
 }
 
 // --- Supabase-реализация (шаг 3b) ----------------------------------------

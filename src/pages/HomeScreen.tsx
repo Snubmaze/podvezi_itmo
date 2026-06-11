@@ -139,6 +139,7 @@ export function HomeScreen({
   onOpenProfile,
   onCreateTrip,
   onMyTrips,
+  onVerifyDriver,
 }: {
   user: User
   activeRole: ActiveRole
@@ -146,6 +147,7 @@ export function HomeScreen({
   onOpenProfile: () => void
   onCreateTrip: () => void
   onMyTrips: () => void
+  onVerifyDriver: () => void
 }) {
   const canDrive = user.driver_verification_status === 'approved'
   const [modalOpen, setModalOpen] = useState(false)
@@ -243,6 +245,7 @@ export function HomeScreen({
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         status={user.driver_verification_status}
+        onApply={onVerifyDriver}
       />
     </AppScreen>
   )

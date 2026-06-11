@@ -1,13 +1,14 @@
 import { useState } from 'react'
 
 import type { ActiveRole } from '@/components/RoleSwitcher'
+import { DriverRegistrationScreen } from '@/pages/DriverRegistrationScreen'
 import { HomeScreen } from '@/pages/HomeScreen'
 import { MyTripsScreen } from '@/pages/MyTripsScreen'
 import { ProfileScreen } from '@/pages/ProfileScreen'
 import { TripCreateScreen } from '@/pages/TripCreateScreen'
 import type { User } from '@/types/db'
 
-type View = 'home' | 'profile' | 'trip-create' | 'my-trips'
+type View = 'home' | 'profile' | 'trip-create' | 'my-trips' | 'driver-verify'
 
 /** Оболочка авторизованной части: навигация между главным экраном, профилем и поездками. */
 export function AuthenticatedApp({ user }: { user: User }) {
@@ -31,6 +32,15 @@ export function AuthenticatedApp({ user }: { user: User }) {
       <MyTripsScreen user={user} activeRole={activeRole} onBack={() => setView('home')} />
     )
   }
+  if (view === 'driver-verify') {
+    return (
+      <DriverRegistrationScreen
+        user={user}
+        onBack={() => setView('home')}
+        onSubmitted={() => setView('home')}
+      />
+    )
+  }
   return (
     <HomeScreen
       user={user}
@@ -39,6 +49,7 @@ export function AuthenticatedApp({ user }: { user: User }) {
       onOpenProfile={() => setView('profile')}
       onCreateTrip={() => setView('trip-create')}
       onMyTrips={() => setView('my-trips')}
+      onVerifyDriver={() => setView('driver-verify')}
     />
   )
 }

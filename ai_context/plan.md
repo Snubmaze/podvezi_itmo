@@ -70,12 +70,18 @@ end-to-end). Модель — `architecture.md` 5.1.1.
 Realtime-подписки на `trips`/`trip_requests`/`trip_members`. Детали —
 `current_state.md`, контракт сервиса — `architecture.md` 5.5.
 
-## 7. Регистрация и верификация водителя — не начато
+## 7. Регистрация и верификация водителя — **готово**
 
-Подача заявки на роль водителя, данные автомобиля (`vehicles`), загрузка
-документов (`driver_documents`), статусы верификации.
+Экран заявки водителя (`DriverRegistrationScreen`, 6.4): данные авто
+(`vehicles`) + загрузка фото ВУ/СТС в Storage (`driver_documents`),
+создание `moderation_requests`, статус → `pending`. Сервис
+`services/driver.ts` (`submitDriverVerification`/`getDriverApplication`),
+действие провайдера `reloadUser()`. Статус модерации (6.5) — в
+модалке/профиле; причина отклонения (6.9) — на профиле. Блокировка функций
+водителя до `approved` — из шага 4. Без новых миграций. Детали —
+`current_state.md`, контракт — `architecture.md` 5.6.
 
-## 8. Админ-панель модерации — не начато
+## 8. Админ-панель модерации — **в работе**
 
 Интерфейс для администраторов: рассмотрение `moderation_requests` и
 `driver_documents`, управление пользователями.
