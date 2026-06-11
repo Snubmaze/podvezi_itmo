@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft, LogOut } from 'lucide-react'
+import { ChevronLeft, LogOut, ShieldCheck } from 'lucide-react'
 
 import { AppScreen } from '@/components/AppScreen'
 import { Avatar } from '@/components/Avatar'
@@ -10,7 +10,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/hooks/useAuth'
 import { verificationBadge } from '@/lib/verification'
-import { devSetMockDriverStatus } from '@/services/auth'
+import { devSetMockDriverStatus, devSetMockRole } from '@/services/auth'
 import { getDriverApplication } from '@/services/driver'
 import type { User } from '@/types/db'
 
@@ -27,9 +27,11 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 export function ProfileScreen({
   user,
   onBack,
+  onOpenAdmin,
 }: {
   user: User
   onBack: () => void
+  onOpenAdmin: () => void
 }) {
   const { updateDescription, signOut, retry } = useAuth()
   const [description, setDescription] = useState(user.description ?? '')
@@ -130,22 +132,44 @@ export function ProfileScreen({
         </Button>
       </div>
 
+      {user.role === 'admin' && (
+        <div className="mt-6">
+          <Button variant="outline" size="lg" className="w-full" onClick={onOpenAdmin}>
+            <ShieldCheck className="size-4" />
+            Модерация заявок
+          </Button>
+        </div>
+      )}
+
       <div className="mt-auto space-y-2 pt-6">
         {import.meta.env.DEV && (
-          <Button
-            variant="outline"
-            size="lg"
-            className="w-full"
-            onClick={() => {
-              const isApproved = user.driver_verification_status === 'approved'
-              devSetMockDriverStatus(isApproved ? 'none' : 'approved')
-              retry()
-            }}
-          >
-            {user.driver_verification_status === 'approved'
-              ? 'Снять статус водителя (дев)'
-              : 'Стать водителем (дев)'}
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full"
+              onClick={() => {
+                const isApproved = user.driver_verification_status === 'approved'
+                devSetMockDriverStatus(isApproved ? 'none' : 'approved')
+                retry()
+              }}
+            >
+              {user.driver_verification_status === 'approved'
+                ? 'Снять статус водителя (дев)'
+                : 'Стать водителем (дев)'}
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full"
+              onClick={() => {
+                devSetMockRole(user.role === 'admin' ? 'passenger' : 'admin')
+                retry()
+              }}
+            >
+              {user.role === 'admin' ? 'Снять админа (дев)' : 'Стать админом (дев)'}
+            </Button>
+          </>
         )}
         <Button
           variant="ghost"

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import type { ActiveRole } from '@/components/RoleSwitcher'
+import { AdminModerationScreen } from '@/pages/AdminModerationScreen'
 import { DriverRegistrationScreen } from '@/pages/DriverRegistrationScreen'
 import { HomeScreen } from '@/pages/HomeScreen'
 import { MyTripsScreen } from '@/pages/MyTripsScreen'
@@ -8,7 +9,13 @@ import { ProfileScreen } from '@/pages/ProfileScreen'
 import { TripCreateScreen } from '@/pages/TripCreateScreen'
 import type { User } from '@/types/db'
 
-type View = 'home' | 'profile' | 'trip-create' | 'my-trips' | 'driver-verify'
+type View =
+  | 'home'
+  | 'profile'
+  | 'trip-create'
+  | 'my-trips'
+  | 'driver-verify'
+  | 'admin'
 
 /** Оболочка авторизованной части: навигация между главным экраном, профилем и поездками. */
 export function AuthenticatedApp({ user }: { user: User }) {
@@ -16,7 +23,16 @@ export function AuthenticatedApp({ user }: { user: User }) {
   const [activeRole, setActiveRole] = useState<ActiveRole>('passenger')
 
   if (view === 'profile') {
-    return <ProfileScreen user={user} onBack={() => setView('home')} />
+    return (
+      <ProfileScreen
+        user={user}
+        onBack={() => setView('home')}
+        onOpenAdmin={() => setView('admin')}
+      />
+    )
+  }
+  if (view === 'admin') {
+    return <AdminModerationScreen onBack={() => setView('profile')} />
   }
   if (view === 'trip-create') {
     return (

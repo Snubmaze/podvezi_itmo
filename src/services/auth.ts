@@ -12,7 +12,7 @@
 
 import { supabase } from '@/lib/supabase'
 import { getInitDataRaw, isTelegramEnv } from '@/lib/telegram'
-import type { DriverVerificationStatus, User } from '@/types/db'
+import type { DriverVerificationStatus, User, UserRole } from '@/types/db'
 
 export interface AuthBackend {
   /** Boot/авторизация: вернуть текущего пользователя (создав при первом входе). */
@@ -107,6 +107,16 @@ export function devSetMockDriverStatus(status: DriverVerificationStatus): void {
     driver_verification_status: status,
     updated_at: new Date().toISOString(),
   })
+}
+
+/**
+ * DEV-only: подменяет роль мок-пользователя в localStorage (для проверки
+ * админ-панели локально). В Supabase-режиме роль `admin` назначается в БД.
+ */
+export function devSetMockRole(role: UserRole): void {
+  const user = loadStoredUser()
+  if (!user) return
+  storeUser({ ...user, role, updated_at: new Date().toISOString() })
 }
 
 // --- Supabase-реализация (шаг 3b) ----------------------------------------
