@@ -24,6 +24,7 @@
     --color-ring: var(--ring);
     --color-input: var(--input);
     --color-border: var(--border);
+    --color-destructive-foreground: var(--destructive-foreground);
     --color-destructive: var(--destructive);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
@@ -39,6 +40,22 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
+
+    /* Status / semantic tokens — see ai_context/design_system.md */
+    --color-success: var(--success);
+    --color-success-muted: var(--success-muted);
+    --color-success-foreground: var(--success-foreground);
+    --color-warning: var(--warning);
+    --color-warning-muted: var(--warning-muted);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-danger: var(--danger);
+    --color-danger-muted: var(--danger-muted);
+    --color-danger-foreground: var(--danger-foreground);
+    --color-neutral: var(--neutral);
+    --color-neutral-muted: var(--neutral-muted);
+    --color-neutral-foreground: var(--neutral-foreground);
+    --color-tertiary: var(--text-tertiary);
+
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -49,72 +66,108 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --background: #F5F6F8;
+    --foreground: #15171A;
+    --card: #FFFFFF;
+    --card-foreground: #15171A;
+    --popover: #FFFFFF;
+    --popover-foreground: #15171A;
+    --primary: #2F6FED;
+    --primary-foreground: #FFFFFF;
+    --secondary: #EEF0F2;
+    --secondary-foreground: #15171A;
+    --muted: #EEF0F2;
+    --muted-foreground: #6B7280;
+    --accent: #E8EFFE;
+    --accent-foreground: #2F6FED;
+    --destructive: #E5484D;
+    --destructive-foreground: #FFFFFF;
+    --border: #E6E8EC;
+    --input: #E6E8EC;
+    --ring: #2F6FED;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --sidebar: #FFFFFF;
+    --sidebar-foreground: #15171A;
+    --sidebar-primary: #2F6FED;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: #EEF0F2;
+    --sidebar-accent-foreground: #15171A;
+    --sidebar-border: #E6E8EC;
+    --sidebar-ring: #2F6FED;
+
+    /* Status / semantic tokens — see ai_context/design_system.md */
+    --success: #2BB673;
+    --success-muted: #E5F7EE;
+    --success-foreground: #1A7A4C;
+    --warning: #F5A623;
+    --warning-muted: #FFF4E0;
+    --warning-foreground: #B5760A;
+    --danger: #E5484D;
+    --danger-muted: #FCE9E9;
+    --danger-foreground: #B53337;
+    --neutral: #8A8F98;
+    --neutral-muted: #EEF0F2;
+    --neutral-foreground: #5F6570;
+    --text-tertiary: #A1A6AE;
 }
 
+/*
+ * Dark theme — DRAFT. The user only provided light-theme tokens; values
+ * below are derived for contrast and need confirmation at step 10
+ * (UI/UX polish, dark/light, Telegram themes). See design_system.md.
+ */
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --background: #0F1115;
+    --foreground: #F5F6F8;
+    --card: #181B20;
+    --card-foreground: #F5F6F8;
+    --popover: #181B20;
+    --popover-foreground: #F5F6F8;
+    --primary: #5B8DEF;
+    --primary-foreground: #0F1115;
+    --secondary: #23262C;
+    --secondary-foreground: #F5F6F8;
+    --muted: #23262C;
+    --muted-foreground: #9CA3AF;
+    --accent: #1E2A47;
+    --accent-foreground: #5B8DEF;
+    --destructive: #F2747A;
+    --destructive-foreground: #2A0E10;
+    --border: rgba(255, 255, 255, 0.08);
+    --input: rgba(255, 255, 255, 0.12);
+    --ring: #5B8DEF;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --sidebar: #181B20;
+    --sidebar-foreground: #F5F6F8;
+    --sidebar-primary: #5B8DEF;
+    --sidebar-primary-foreground: #0F1115;
+    --sidebar-accent: #23262C;
+    --sidebar-accent-foreground: #F5F6F8;
+    --sidebar-border: rgba(255, 255, 255, 0.08);
+    --sidebar-ring: #5B8DEF;
+
+    --success: #34D399;
+    --success-muted: #113328;
+    --success-foreground: #6EE7B7;
+    --warning: #FBBF24;
+    --warning-muted: #3A2A0A;
+    --warning-foreground: #FCD34D;
+    --danger: #F2747A;
+    --danger-muted: #3A1416;
+    --danger-foreground: #FCA5A5;
+    --neutral: #9CA3AF;
+    --neutral-muted: #23262C;
+    --neutral-foreground: #D1D5DB;
+    --text-tertiary: #6B7280;
 }
 
 @layer base {

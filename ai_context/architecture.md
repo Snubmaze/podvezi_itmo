@@ -20,7 +20,7 @@
 
 - PostgreSQL + RLS + Database Functions/Triggers — где это возможно;
 - **Supabase Edge Functions** (Deno) — для логики, требующей секретов
-  (`TELEGRAM_BOT_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`) или вызовов внешних
+  (`TELEGRAM_BOT_TOKEN`, `SUPABASE_SECRET_KEY`) или вызовов внешних
   API.
 
 Код Edge Functions размещается в `supabase/functions/` (появится на шаге

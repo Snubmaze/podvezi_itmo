@@ -1,25 +1,107 @@
 # Дизайн-система — "Попутчик ИТМО"
 
-> TODO: вставить дизайн-систему.
->
-> Этот файл — заглушка. Пользователь должен прислать содержимое
-> дизайн-системы (цветовые токены, типографика, отступы/spacing-шкала,
-> радиусы, тени, состояния компонентов и т.п.) отдельным сообщением.
->
-> **Напоминание пользователю**: пожалуйста, предоставьте дизайн-систему
-> (Figma-токены, готовый markdown/JSON с токенами, либо описание стиля),
-> чтобы наполнить этот файл. До этого момента UI-компоненты будут
-> реализовываться на дефолтных стилях shadcn/ui + Tailwind, без кастомной
-> темизации, и при появлении дизайн-системы потребуется их пересмотреть.
+## Цветовые токены (источник — предоставлено пользователем)
 
-## Что должно появиться в этом файле после получения дизайн-системы
+Светлая тема. Значения ниже — единственный источник истины для цветов;
+применены в `src/index.css` (см. таблицу маппинга).
 
-- Цветовая палитра (light/dark, в т.ч. соответствие Telegram
-  `themeParams`).
-- Типографика (шрифты, размеры, насыщенность, line-height).
-- Шкала отступов/spacing, радиусы скругления, тени.
-- Базовые компоненты и их варианты (кнопки, карточки, поля ввода, бейджи
-  статусов и т.д.) — в соответствии с shadcn/ui.
-- Иконография (используемый набор иконок).
-- Принципы адаптации под Telegram Mini Apps (safe-area, нативные
-  паттерны навигации).
+```css
+:root {
+  --color-bg: #F5F6F8;
+  --color-surface: #FFFFFF;
+  --color-border: #E6E8EC;
+
+  --color-text-primary: #15171A;
+  --color-text-secondary: #6B7280;
+  --color-text-tertiary: #A1A6AE;
+
+  --color-primary: #2F6FED;
+  --color-primary-foreground: #FFFFFF;
+  --color-primary-muted: #E8EFFE;
+
+  --color-success: #2BB673;
+  --color-success-muted: #E5F7EE;
+  --color-success-foreground: #1A7A4C;
+
+  --color-warning: #F5A623;
+  --color-warning-muted: #FFF4E0;
+  --color-warning-foreground: #B5760A;
+
+  --color-danger: #E5484D;
+  --color-danger-muted: #FCE9E9;
+  --color-danger-foreground: #B53337;
+
+  --color-neutral: #8A8F98;
+  --color-neutral-muted: #EEF0F2;
+  --color-neutral-foreground: #5F6570;
+}
+```
+
+## Маппинг на переменные shadcn/ui (Tailwind v4, `src/index.css`)
+
+| Токен дизайн-системы | shadcn/ui переменная | Назначение |
+|---|---|---|
+| `--color-bg` | `--background` | фон страницы |
+| `--color-surface` | `--card`, `--popover`, `--sidebar` | поверхности карточек/попапов |
+| `--color-text-primary` | `--foreground`, `--card-foreground`, `--popover-foreground` | основной текст |
+| `--color-text-secondary` | `--muted-foreground` | вторичный текст |
+| `--color-text-tertiary` | `--tertiary` (доп. токен) | третичный текст (плейсхолдеры, подписи) |
+| `--color-border` | `--border`, `--input`, `--sidebar-border` | границы, поля ввода |
+| `--color-primary` | `--primary`, `--ring`, `--sidebar-primary` | основной акцент, фокус-кольцо |
+| `--color-primary-foreground` | `--primary-foreground`, `--sidebar-primary-foreground` | текст на primary |
+| `--color-primary-muted` | `--accent`, `--sidebar-accent` | подсветка/выбранное состояние |
+| `--color-neutral-muted` | `--secondary`, `--muted`, `--accent-foreground`(text) | вторичные кнопки, плашки |
+| `--color-danger` | `--destructive` | деструктивные действия/ошибки |
+| `--color-success` / `-muted` / `-foreground` | `--success` / `--success-muted` / `--success-foreground` (доп. токены) | статусы "одобрено", "поездка завершена" и т.п. |
+| `--color-warning` / `-muted` / `-foreground` | `--warning` / `--warning-muted` / `--warning-foreground` (доп. токены) | статусы "на модерации", "ожидание" |
+| `--color-danger` / `-muted` / `-foreground` | `--danger` / `--danger-muted` / `--danger-foreground` (доп. токены) | статусы "отклонено", "отменено" |
+| `--color-neutral` / `-muted` / `-foreground` | `--neutral` / `--neutral-muted` / `--neutral-foreground` (доп. токены) | нейтральные статусы (например "черновик") |
+
+`--success*`, `--warning*`, `--danger*`, `--neutral*`, `--tertiary` —
+дополнительные токены поверх стандартного набора shadcn/ui, добавлены в
+`@theme inline` в `src/index.css`. Доступны как Tailwind-утилиты:
+`bg-success`, `text-success-foreground`, `bg-success-muted`,
+`bg-warning`, `text-warning-foreground`, `bg-warning-muted`,
+`bg-danger`, `text-danger-foreground`, `bg-danger-muted`,
+`bg-neutral`, `text-neutral-foreground`, `bg-neutral-muted`,
+`text-tertiary`.
+
+**Использование статусных токенов** — типовой паттерн для бейджей
+статусов (верификация водителя, статус поездки, заявки и т.д.):
+
+| Семантика статуса | Токены |
+|---|---|
+| Одобрено / активно / завершено успешно | `success` / `success-muted` / `success-foreground` |
+| На рассмотрении / ожидание | `warning` / `warning-muted` / `warning-foreground` |
+| Отклонено / отменено / ошибка | `danger` / `danger-muted` / `danger-foreground` |
+| Черновик / неактивно / нейтральный статус | `neutral` / `neutral-muted` / `neutral-foreground` |
+
+## Тёмная тема — TODO
+
+Пользователь предоставил токены только для светлой темы. В
+`src/index.css` для `.dark` сейчас используются производные значения
+(затемнённый фон, осветлённый primary и статусные цвета для контраста),
+подобранные как разумное приближение — **черновик**, требует
+подтверждения/уточнения на шаге 10 (UI/UX полировка, dark/light,
+Telegram themes).
+
+## Типографика, отступы, радиусы — не специфицированы
+
+Пользователь не предоставил отдельных токенов для типографики, шкалы
+отступов и радиусов. Используются дефолты shadcn/ui:
+
+- Шрифт: `Geist Variable` (через `@fontsource-variable/geist`).
+- Радиус: `--radius: 0.625rem` (база для `--radius-sm` … `--radius-4xl`).
+- Отступы — стандартная шкала Tailwind.
+
+Если для проекта нужны другие значения — добавить их в этот файл и в
+`@theme inline` / `:root` в `src/index.css`.
+
+## Принципы использования
+
+- Все UI-компоненты — на базе shadcn/ui (`src/components/ui`), стили —
+  через Tailwind-классы, ссылающиеся на токены выше (`bg-background`,
+  `text-foreground`, `bg-primary`, `bg-success-muted` и т.п.).
+- Не использовать произвольные hex-цвета в компонентах — только токены
+  из этой таблицы (через Tailwind-классы или CSS-переменные).
+- Адаптация под Telegram Mini Apps (`themeParams`, safe-area) — шаг 10.
