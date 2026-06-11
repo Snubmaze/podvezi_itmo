@@ -118,27 +118,89 @@ podvezi_app/
   предусмотрена мок-проверка ITMO ID (реальная интеграция с ITMO ID —
   вне рамок текущего этапа, реализуется как заглушка/мок).
 
-### 5.2 Схема базы данных (черновая, уточняется по ходу шага 2)
+### 5.2 Схема базы данных (финальная — зафиксирована на шаге 2)
 
 Все таблицы — с включённым RLS (`ENABLE ROW LEVEL SECURITY`) и явными
-политиками доступа (см. `rules.md`).
+политиками доступа (см. `rules.md` и раздел 5.2.1 ниже).
+
+Реализация — версионированные SQL-миграции в `supabase/migrations/`
+(применяются через Supabase Management API). Сидирование справочников —
+`supabase/seed.sql`. Все enum'ы продублированы как TS union types в
+`src/types/db.ts`.
+
+#### Решения шага 2 (зафиксированы)
+
+- **Единая таблица точек `locations`** (вместо отдельных `campuses` /
+  `dormitories`). Тип точки задаётся колонкой `kind` (`campus` |
+  `dormitory`). Причина: корпусов и общежитий немного, а единая таблица
+  даёт настоящие FK из `routes`/`trips` (нет полиморфных ссылок),
+  упрощает RLS и запросы. При необходимости «корпуса» / «общежития»
+  отдаются через SQL-вью или фильтр по `kind`.
+- **`trips` ссылается на точки напрямую** (`origin_id`, `destination_id`
+  → `locations.id`), как в ТЗ («точка отправления / точка назначения»).
+  `routes` остаётся справочником популярных/допустимых комбинаций точек
+  (для фильтров и подсказок в UI); `trips.route_id` — необязательная
+  ссылка.
+- **Enum-статусы** реализованы как Postgres `enum`-типы + синхронные TS
+  union types. Конкретные наборы значений зафиксированы ниже (п. 5.2.2).
+
+#### Postgres enum-типы (5.2.2)
+
+| Тип | Значения | Где используется |
+|-----|----------|------------------|
+| `user_role` | `passenger` \| `driver` \| `admin` | `users.role` |
+| `driver_verification_status` | `none` \| `pending` \| `approved` \| `rejected` | `users.driver_verification_status` (`none` = заявка не подавалась) |
+| `location_kind` | `campus` \| `dormitory` | `locations.kind` |
+| `document_type` | `license` (ВУ) \| `sts` (СТС) | `driver_documents.document_type` |
+| `document_status` | `pending` \| `approved` \| `rejected` | `driver_documents.status` |
+| `moderation_type` | `driver_verification` | `moderation_requests.type` |
+| `moderation_status` | `pending` \| `approved` \| `rejected` | `moderation_requests.status` |
+| `trip_status` | `active` \| `completed` \| `cancelled` | `trips.status` |
+| `trip_member_role` | `driver` \| `passenger` | `trip_members.role_in_trip` |
+| `trip_member_status` | `confirmed` \| `cancelled` \| `completed` \| `no_show` | `trip_members.status` |
+| `trip_request_status` | `pending` \| `accepted` \| `rejected` \| `cancelled` | `trip_requests.status` |
+
+> Примечание по release 2 («поездки без водителя», шаг 9 плана): в части 2
+> промтов для них упомянут отдельный набор статусов («Ожидает
+> пассажиров» / «Подтверждена» / «Завершена» / «Отменена»). В текущей
+> схеме `trip_requests` — это **заявки пассажира на присоединение к
+> поездке** (как в исходной архитектуре). Сценарий release 2 будет
+> domodelироваться на шаге 9 (вероятно через `trips` с `driver_id = NULL`
+> и расширение `trip_status`); решение зафиксируется здесь тогда же.
 
 #### `users`
 Профиль пользователя (расширение identity, привязанной к Telegram).
+`id` = `auth.users.id` (Supabase Auth, заполняется на шаге 3).
 
 | Поле | Тип | Описание |
 |------|-----|----------|
-| id | uuid (PK) | соответствует id записи аутентификации |
-| telegram_id | bigint, unique | Telegram user id |
+| id | uuid (PK, FK → auth.users) | соответствует id записи аутентификации |
+| telegram_id | bigint, unique, not null | Telegram user id |
 | telegram_username | text, nullable | @username в Telegram |
-| full_name | text | ФИО (персональные данные, см. `rules.md`) |
-| isu_number | text, unique, nullable | номер ИСУ (персональные данные) |
-| itmo_id_status | text/enum | статус мок-верификации ITMO ID |
-| role | text/enum | базовая роль: `passenger` \| `driver` \| `admin` |
-| driver_verification_status | text/enum, nullable | см. ТЗ 5.3.1 |
-| phone | text, nullable | контактный телефон (персональные данные) |
-| avatar_url | text, nullable | URL аватара (Storage или Telegram) |
+| full_name | text, nullable | ФИО (ПД; приходит из мок ITMO ID, см. шаг 3) |
+| isu_number | text, unique, nullable | номер ИСУ (ПД) |
+| itmo_id_linked | boolean, not null, default false | пройден ли мок-вход через ITMO ID |
+| course | smallint, nullable | курс (из ITMO ID) |
+| age | smallint, nullable | возраст (из ITMO ID) |
+| description | text, nullable | описание профиля (ТЗ 5.8, редактируемое) |
+| role | user_role, not null, default `passenger` | базовая роль |
+| driver_verification_status | driver_verification_status, not null, default `none` | статус верификации водителя (ТЗ 5.3.1) |
+| phone | text, nullable | контактный телефон (ПД) |
+| avatar_url | text, nullable | URL аватара (мок ITMO ID / Telegram / Storage) |
 | created_at, updated_at | timestamptz | служебные поля |
+
+#### `locations`
+Единый справочник точек маршрутов (корпуса и общежития ИТМО).
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| id | uuid (PK) | |
+| kind | location_kind, not null | `campus` \| `dormitory` |
+| name | text, not null | человекочитаемое название |
+| address | text, nullable | адрес (может быть не задан, напр. ITMO Aparts) |
+| latitude, longitude | numeric, nullable | координаты |
+| is_active | boolean, not null, default true | показывать ли в выборе |
+| created_at | timestamptz | |
 
 #### `vehicles`
 Автомобили водителей.
@@ -146,12 +208,12 @@ podvezi_app/
 | Поле | Тип | Описание |
 |------|-----|----------|
 | id | uuid (PK) | |
-| driver_id | uuid (FK → users.id) | владелец |
-| make | text | марка |
-| model | text | модель |
-| color | text | цвет |
-| plate_number | text | гос. номер (персональные данные) |
-| seats_count | int | число пассажирских мест |
+| driver_id | uuid (FK → users.id), not null | владелец |
+| make | text, not null | марка |
+| model | text, not null | модель |
+| color | text, nullable | цвет |
+| plate_number | text, not null | гос. номер (персональные данные) |
+| seats_count | smallint, not null (1..8) | число пассажирских мест |
 | photo_url | text, nullable | фото автомобиля (Storage) |
 | created_at, updated_at | timestamptz | |
 
@@ -161,86 +223,66 @@ podvezi_app/
 | Поле | Тип | Описание |
 |------|-----|----------|
 | id | uuid (PK) | |
-| driver_id | uuid (FK → users.id) | |
-| document_type | text/enum | тип документа (вод. удостоверение, СТС и т.п.) |
-| file_url | text | путь в Supabase Storage (приватный bucket) |
-| status | text/enum | `pending` \| `approved` \| `rejected` |
+| driver_id | uuid (FK → users.id), not null | |
+| document_type | document_type | `license` (ВУ) \| `sts` (СТС) |
+| file_path | text, not null | путь в приватном Storage-bucket `driver-documents` |
+| status | document_status, default `pending` | `pending` \| `approved` \| `rejected` |
+| comment | text, nullable | комментарий модератора |
 | reviewed_by | uuid (FK → users.id), nullable | админ, проверивший документ |
 | reviewed_at | timestamptz, nullable | |
 | created_at | timestamptz | |
 
 #### `moderation_requests`
-Заявки на модерацию (верификация водителя и пр.).
+Заявки на модерацию (верификация водителя и пр.) — история решений админа.
 
 | Поле | Тип | Описание |
 |------|-----|----------|
 | id | uuid (PK) | |
-| requester_id | uuid (FK → users.id) | кто подал заявку |
-| type | text/enum | например `driver_verification` |
-| status | text/enum | `pending` \| `approved` \| `rejected` |
+| requester_id | uuid (FK → users.id), not null | кто подал заявку |
+| type | moderation_type, default `driver_verification` | тип заявки |
+| status | moderation_status, default `pending` | `pending` \| `approved` \| `rejected` |
 | payload | jsonb, nullable | дополнительные данные заявки |
 | comment | text, nullable | комментарий модератора |
 | reviewed_by | uuid (FK → users.id), nullable | |
 | reviewed_at | timestamptz, nullable | |
 | created_at | timestamptz | |
 
-#### `campuses`
-Справочник учебных корпусов ИТМО.
-
-| Поле | Тип | Описание |
-|------|-----|----------|
-| id | uuid (PK) | |
-| name | text | название корпуса |
-| address | text | адрес |
-| latitude, longitude | numeric, nullable | координаты |
-| created_at | timestamptz | |
-
-#### `dormitories`
-Справочник общежитий ИТМО.
-
-| Поле | Тип | Описание |
-|------|-----|----------|
-| id | uuid (PK) | |
-| name | text | название общежития |
-| address | text | адрес |
-| latitude, longitude | numeric, nullable | координаты |
-| created_at | timestamptz | |
+> Справочники точек — единая таблица `locations` (см. выше, раздел
+> «Решения шага 2»). Отдельных таблиц `campuses` / `dormitories` нет.
 
 #### `routes`
-Маршруты между точками (campus/dormitory в любой комбинации).
+Справочник допустимых/популярных комбинаций точек (для фильтров и
+подсказок в UI). Обе ссылки — настоящие FK на `locations`.
 
 | Поле | Тип | Описание |
 |------|-----|----------|
 | id | uuid (PK) | |
-| origin_type | text/enum | `campus` \| `dormitory` |
-| origin_id | uuid | FK на `campuses.id` или `dormitories.id` (по `origin_type`) |
-| destination_type | text/enum | `campus` \| `dormitory` |
-| destination_id | uuid | FK на `campuses.id` или `dormitories.id` (по `destination_type`) |
+| origin_id | uuid (FK → locations.id), not null | точка отправления |
+| destination_id | uuid (FK → locations.id), not null | точка назначения |
+| is_active | boolean, default true | |
 | created_at | timestamptz | |
-
-> Примечание: т.к. `origin_id`/`destination_id` ссылаются на разные
-> таблицы в зависимости от `*_type`, классический FK constraint
-> невозможен напрямую — потребуется либо проверка через триггер/CHECK +
-> отдельные nullable FK-колонки (`origin_campus_id`,
-> `origin_dormitory_id` и т.д.), либо unified-таблица "точек". Финальное
-> решение принимается на шаге 2 (БД и Supabase) и фиксируется здесь.
+| | CHECK | `origin_id <> destination_id`; UNIQUE(origin_id, destination_id) |
 
 #### `trips`
-Поездки.
+Поездки. Точки отправления/назначения хранятся напрямую (FK на
+`locations`); `route_id` — необязательная привязка к справочнику.
 
 | Поле | Тип | Описание |
 |------|-----|----------|
 | id | uuid (PK) | |
 | driver_id | uuid (FK → users.id), nullable | nullable для "поездок без водителя" (release 2) |
 | vehicle_id | uuid (FK → vehicles.id), nullable | |
-| route_id | uuid (FK → routes.id) | |
-| departure_time | timestamptz | время отправления |
-| seats_total | int | всего мест |
-| seats_available | int | свободно мест |
-| price | numeric, nullable | стоимость места |
-| status | text/enum | см. ТЗ 5.6 (например `planned` \| `active` \| `completed` \| `cancelled`) |
+| origin_id | uuid (FK → locations.id), not null | точка отправления |
+| destination_id | uuid (FK → locations.id), not null | точка назначения |
+| route_id | uuid (FK → routes.id), nullable | необязательная ссылка на справочник маршрутов |
+| departure_time | timestamptz, not null | время отправления |
+| seats_total | smallint, not null (1..8) | всего мест |
+| seats_available | smallint, not null (>=0, <=seats_total) | свободно мест |
+| price | numeric(10,2), nullable | стоимость места |
+| status | trip_status, default `active` | `active` \| `completed` \| `cancelled` |
 | comment | text, nullable | комментарий водителя |
 | created_at, updated_at | timestamptz | |
+| | CHECK | `origin_id <> destination_id` |
 
 #### `trip_members`
 Подтверждённые участники поездки (водитель + пассажиры).
@@ -250,9 +292,10 @@ podvezi_app/
 | id | uuid (PK) | |
 | trip_id | uuid (FK → trips.id) | |
 | user_id | uuid (FK → users.id) | |
-| role_in_trip | text/enum | `driver` \| `passenger` |
-| status | text/enum | `confirmed` \| `cancelled` \| `completed` \| `no_show` |
+| role_in_trip | trip_member_role | `driver` \| `passenger` |
+| status | trip_member_status, default `confirmed` | `confirmed` \| `cancelled` \| `completed` \| `no_show` |
 | joined_at | timestamptz | |
+| | UNIQUE | (trip_id, user_id) |
 
 #### `trip_requests`
 Заявки пассажиров на участие в поездке (до подтверждения водителем).
@@ -262,23 +305,51 @@ podvezi_app/
 | id | uuid (PK) | |
 | trip_id | uuid (FK → trips.id) | |
 | passenger_id | uuid (FK → users.id) | |
-| status | text/enum | `pending` \| `accepted` \| `rejected` \| `cancelled` |
+| status | trip_request_status, default `pending` | `pending` \| `accepted` \| `rejected` \| `cancelled` |
 | message | text, nullable | сообщение от пассажира |
 | created_at, updated_at | timestamptz | |
+| | UNIQUE | (trip_id, passenger_id) |
 
-> Все enum'ы и точные наборы статусов (особенно "статус верификации
-> водителя" из ТЗ 5.3.1 и "статус поездки" из ТЗ 5.6) должны быть
-> зафиксированы как TypeScript union types/enums в `src/types/` и как
-> Postgres enum/`CHECK` constraints в миграциях — единообразно. Если
-> точные значения статусов не определены — уточнить у пользователя перед
-> реализацией (шаг 2).
+#### 5.2.1 RLS — модель доступа (кратко)
+
+Вспомогательная функция `public.is_admin()` (SECURITY DEFINER) — проверка
+роли `admin` без рекурсии RLS. Сводка политик:
+
+- `users` — SELECT/UPDATE своей строки (`id = auth.uid()`) или админ;
+  INSERT своей строки; DELETE только админ. Привилегированные поля
+  (`role`, `driver_verification_status`, поля из ITMO ID) меняются на
+  серверном слое (Edge Function / админ), не пользователем напрямую.
+- `locations`, `routes` — SELECT всем аутентифицированным; запись только
+  админ.
+- `vehicles` — владелец (`driver_id = auth.uid()`) или админ.
+- `driver_documents` — ПД: SELECT/INSERT/DELETE владелец или админ;
+  UPDATE (смена статуса) — только админ.
+- `moderation_requests` — SELECT заявитель или админ; INSERT свои;
+  UPDATE только админ.
+- `trips` — SELECT всем аутентифицированным; INSERT только
+  верифицированный водитель (`role in (driver, admin)` и
+  `driver_verification_status = approved`); UPDATE/DELETE владелец или
+  админ.
+- `trip_members` — SELECT участник / водитель поездки / админ; запись —
+  водитель поездки или админ (плюс участник может отменить своё участие).
+- `trip_requests` — SELECT пассажир / водитель поездки / админ; INSERT
+  пассажир (свои); UPDATE пассажир (отмена) / водитель (accept/reject) /
+  админ.
+
+> Профиль другого пользователя (для отображения имени/аватара водителя в
+> списке поездок) при необходимости отдаётся через отдельную SQL-вью с
+> безопасным набором полей (без `isu_number` / `phone`) — добавляется на
+> шаге, где это потребуется (6). Сейчас RLS на `users` — строгий.
 
 ### 5.3 Storage
 
-- Приватный bucket для документов водителей (`driver-documents`) — доступ
-  только владельцу записи и администраторам (через RLS-политики Storage).
-- Публичный/приватный bucket для фото автомобилей и аватаров —
-  определяется на шаге 2.
+- **`driver-documents`** — приватный bucket (создан на шаге 2). Доступ по
+  RLS-политикам `storage.objects`: путь файла начинается с `<user_id>/...`;
+  INSERT/SELECT/UPDATE/DELETE — только владелец (`(storage.foldername
+  (name))[1] = auth.uid()::text`) или админ (`is_admin()`).
+- Bucket для фото автомобилей и аватаров — будет добавлен на шаге 7
+  (регистрация водителя / `vehicles.photo_url`). Аватары из мок ITMO ID
+  приходят внешним URL и в Storage пока не хранятся.
 
 ### 5.4 Realtime
 
@@ -301,3 +372,5 @@ podvezi_app/
 |------|-----------|---------|
 | 2026-06-11 | Первая версия документа (шаг 1: инициализация) | Старт проекта |
 | 2026-06-11 | Зафиксирован выбор "серверная логика — через Supabase Edge Functions, без отдельного backend-сервиса" | Решение пользователя на шаге 1 |
+| 2026-06-11 | Шаг 2: финальная схема БД. Единая таблица `locations` (kind) вместо `campuses`/`dormitories`; `trips` ссылается на точки напрямую; `routes` — справочник комбинаций; зафиксированы enum-статусы и RLS-модель (5.2.1) | Решение пользователя на шаге 2 (мало точек → единая таблица) |
+| 2026-06-11 | Шаг 2: миграции применяются через Supabase Management API (нет локального CLI/пароля БД); создан приватный Storage bucket `driver-documents` | Решение пользователя на шаге 2 |

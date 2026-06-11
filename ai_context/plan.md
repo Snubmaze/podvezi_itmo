@@ -14,15 +14,17 @@
 подключение Tailwind + shadcn/ui + Telegram Mini Apps SDK + Supabase JS,
 базовая структура папок, `.env.example`. Без бизнес-логики и экранов.
 
-## 2. БД и Supabase — **в работе** (ожидает данных от пользователя)
+## 2. БД и Supabase — **готово**
 
-Создание Supabase-проекта (или подключение существующего), миграции для
-таблиц `users`, `vehicles`, `trips`, `trip_members`, `routes`,
-`dormitories`, `campuses`, `driver_documents`, `moderation_requests`,
-`trip_requests`. Включение RLS и политик доступа. Сидирование справочников
-`campuses`/`dormitories`/`routes`.
+Миграции применены к Supabase-проекту через Management API: таблицы
+`users`, `locations` (единая таблица точек вместо `campuses`/`dormitories`),
+`routes`, `vehicles`, `driver_documents`, `moderation_requests`, `trips`,
+`trip_members`, `trip_requests`; enum-типы; RLS включён с явными политиками
+на всех таблицах; приватный Storage-bucket `driver-documents` с политиками.
+Справочники засидированы (5 корпусов, 5 общежитий, 50 маршрутов). Детали —
+в `current_state.md` и `architecture.md` (раздел 5.2).
 
-## 3. Telegram-авторизация, регистрация (номер ИСУ) и мок ITMO ID — не начато
+## 3. Telegram-авторизация, регистрация (номер ИСУ) и мок ITMO ID — **в работе**
 
 Авторизация через Telegram `initData`, выпуск сессии Supabase, экран
 регистрации (ввод номера ИСУ), мок-проверка ITMO ID.

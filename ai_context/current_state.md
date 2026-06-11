@@ -102,9 +102,69 @@
 
 Все секреты лежат только в `.env` (не в git).
 
+## Шаг 2. БД и Supabase — выполнено
+
+Дата: 2026-06-11.
+
+### Решения по схеме (зафиксированы в `architecture.md` 5.2)
+
+- **Единая таблица `locations`** (`kind` = `campus` | `dormitory`) вместо
+  отдельных `campuses`/`dormitories` — по решению пользователя (точек
+  мало → проще RLS и настоящие FK). `trips`/`routes` ссылаются на
+  `locations` напрямую.
+- `trips` хранит `origin_id`/`destination_id` напрямую; `routes` —
+  справочник популярных комбинаций (`trips.route_id` необязателен).
+- Зафиксированы 11 enum-типов (роли, статусы верификации/документов/
+  модерации/поездок/участников/заявок) — см. `architecture.md` 5.2.2 и
+  `src/types/db.ts`.
+- Статусы release 2 («поездки без водителя») отложены на шаг 9 (заметка в
+  `architecture.md`).
+
+### Что сделано
+
+- Созданы миграции в `supabase/migrations/`:
+  - `20260611120000_schema.sql` — расширение `pgcrypto`, 11 enum-типов,
+    функция-триггер `set_updated_at`, таблицы `users`, `locations`,
+    `routes`, `vehicles`, `driver_documents`, `moderation_requests`,
+    `trips`, `trip_members`, `trip_requests` (PK/FK, CHECK, индексы,
+    триггеры `updated_at`).
+  - `20260611120100_rls.sql` — функция `public.is_admin()` (SECURITY
+    DEFINER), `ENABLE ROW LEVEL SECURITY` и явные политики на всех 9
+    таблицах (модель доступа — `architecture.md` 5.2.1; ПД ограничены
+    владельцем/админом).
+  - `20260611120200_storage.sql` — приватный bucket `driver-documents`
+    и 4 политики `storage.objects` (доступ по первому сегменту пути
+    `<user_id>/...` или админ).
+- `supabase/seed.sql` — справочники: 5 корпусов, 5 общежитий (вкл. ITMO
+  Aparts), 50 маршрутов (все пары корпус↔общежитие в обе стороны).
+  Идемпотентен.
+- `src/types/db.ts` — TS union-типы enum'ов и интерфейсы строк всех
+  таблиц, синхронизированы со схемой.
+
+### Как применено и проверено
+
+- Миграции и сид применены к проекту `ythaejxeaekgxtivqaqp` через
+  **Supabase Management API** (`POST /v1/projects/{ref}/database/query`,
+  Bearer PAT) — локального supabase CLI / пароля БД нет. PAT использован
+  разово, не сохранён в коде/гите. Плейсхолдер `SUPABASE_ACCESS_TOKEN`
+  добавлен в `.env.example`.
+- Проверено запросами к БД: 9 таблиц с `relrowsecurity = true`; политики
+  на каждой таблице + 4 на `storage.objects`; 11 enum-типов; `locations`
+  = 5 campus + 5 dormitory; `routes` = 50; bucket `driver-documents`
+  приватный.
+
+### Что НЕ сделано (намеренно)
+
+- Нет записей `users` (создаются на шаге 3 через Telegram-авторизацию;
+  `users.id` ссылается на `auth.users`).
+- Bucket для фото авто/аватаров — на шаге 7.
+- Безопасная вью публичного профиля (имя/аватар водителя без ИСУ/телефона
+  для списка поездок) — добавится на шаге 6, где понадобится.
+- `npm install` в этой среде не прошёл (нет сети), поэтому `tsc`/`lint`
+  локально не запускались; `src/types/db.ts` — без импортов, проверится
+  на следующей сборке.
+
 ## Следующий шаг
 
-**Шаг 2: БД и Supabase** — все необходимые данные получены, можно
-начинать: проектирование схемы (таблицы из `architecture.md`), миграции,
-RLS-политики, сидирование справочников `campuses`/`dormitories` по
-списку адресов выше.
+**Шаг 3: Telegram-авторизация, регистрация (номер ИСУ) и мок ITMO ID** —
+см. `claude_code_promts.md`, Часть 3.
