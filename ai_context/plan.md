@@ -26,8 +26,16 @@
 
 ## 3. Telegram-авторизация, регистрация (номер ИСУ) и мок ITMO ID — **в работе**
 
-Авторизация через Telegram `initData`, выпуск сессии Supabase, экран
-регистрации (ввод номера ИСУ), мок-проверка ITMO ID.
+Разбит на части:
+
+- **3a — готово**: весь UI-флоу на мок-провайдере авторизации (экраны
+  Splash 6.1, регистрация ИСУ 6.2, мок-вход ITMO ID, заглушка главного
+  экрана), `services/itmoId.ts`, `services/auth.ts` (интерфейс +
+  мок-реализация), `AuthProvider`/`useAuth`/`AppFlow`. Детали —
+  `current_state.md`.
+- **3b — в работе (следующее)**: Edge Function `telegram-auth` (проверка
+  HMAC initData + Admin API), Supabase-реализация `AuthBackend`, запись
+  `public.users`, секреты Edge Function. Стратегия — `architecture.md` 5.1.
 
 ## 4. Роли и профиль — не начато
 

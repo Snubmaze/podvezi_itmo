@@ -108,15 +108,52 @@ podvezi_app/
 
 ## 5. Backend — Supabase
 
-### 5.1 Аутентификация
+### 5.1 Аутентификация (зафиксировано на шаге 3)
 
-- Базовая идентификация — через Telegram (`initData`), не email/password.
-- Подход к выпуску Supabase-сессии (custom JWT / Supabase Auth с кастомным
-  провайдером / анонимная сессия + привязка telegram_id) уточняется и
-  фиксируется на шаге 3 плана.
-- Дополнительно при первой регистрации пользователь вводит номер ИСУ;
-  предусмотрена мок-проверка ITMO ID (реальная интеграция с ITMO ID —
-  вне рамок текущего этапа, реализуется как заглушка/мок).
+Базовая идентификация — через Telegram (`initData`), не email/password.
+Выпуск Supabase-сессии — через **Edge Function + Admin API** (решение
+пользователя на шаге 3):
+
+1. Frontend получает `initDataRaw` из Telegram SDK и POST-ит его в Edge
+   Function **`telegram-auth`** (`verify_jwt = false`).
+2. Edge Function проверяет HMAC-SHA256 подпись `initData` секретом,
+   производным от `TELEGRAM_BOT_TOKEN` (по алгоритму Telegram:
+   `secret = HMAC_SHA256("WebAppData", bot_token)`), и срок годности
+   (`auth_date`). Невалидная подпись → 401.
+3. По `telegram_id` находит/создаёт пользователя в `auth.users` через
+   Admin API. Учётка детерминированная: email
+   `tg<telegram_id>@telegram.podvezi.local`, пароль = HMAC(серверный
+   секрет `AUTH_USER_SECRET`, `telegram_id`) — известен только серверу.
+4. Гарантирует строку в `public.users` (`id` = id auth-пользователя,
+   `telegram_id`, `telegram_username`). Поля профиля (`full_name`, `course`,
+   `age`, `avatar_url`, `isu_number`) на этом шаге не заполняются.
+5. Серверно выполняет `signInWithPassword` и возвращает клиенту
+   `{ access_token, refresh_token, is_new_user }`. Клиент вызывает
+   `supabase.auth.setSession(...)`. Пароль клиенту не передаётся.
+
+Секреты Edge Function (через `supabase secrets` / Management API):
+`TELEGRAM_BOT_TOKEN`, `AUTH_USER_SECRET`, плюс автоматически доступные
+`SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`. Безопасность (ТЗ 7.4): HTTPS,
+JWT-сессия Supabase, доступ к данным только через RLS.
+
+**Реализация по частям (шаг 3):** часть 3a — весь UI-флоу (экраны 6.1, 6.2,
+мок-вход ITMO ID) на мок-провайдере авторизации (без Telegram/Supabase, для
+разработки/демо); часть 3b — реальный `telegram-auth` Edge Function и
+персистентность в Supabase за теми же интерфейсами (`services/auth.ts`).
+
+#### Мок ITMO ID (заглушка, заменяемая на реальный SSO)
+
+Реальная интеграция с ITMO ID/SSO (ТЗ 5.1) недоступна → заглушка за
+интерфейсом `services/itmoId.ts` (`fetchItmoIdProfile(login, password)`):
+
+- Любые непустые логин+пароль = успех (без внешнего запроса). Пустые поля —
+  обычная клиентская валидация.
+- Возвращает детерминированный мок-профиль (ФИО, `course`, `age`,
+  `avatar_url`), выбираемый из 3–5 предопределённых профилей по хэшу
+  логина → одинаковый логин всегда даёт одинаковые данные.
+- Полученные поля сохраняются в `users`, выставляется `itmo_id_linked =
+  true`. Точка замены на реальный ITMO ID — реализация этого интерфейса
+  (ТЗ «Перспективы развития», п.16).
 
 ### 5.2 Схема базы данных (финальная — зафиксирована на шаге 2)
 

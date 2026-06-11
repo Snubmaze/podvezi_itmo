@@ -164,7 +164,58 @@
   локально не запускались; `src/types/db.ts` — без импортов, проверится
   на следующей сборке.
 
+## Шаг 3 (часть 3a). UI-флоу авторизации на мок-провайдере — выполнено
+
+Дата: 2026-06-11. Шаг 3 разбит на части (решение пользователя): **3a** —
+весь UI-флоу на мок-провайдере (без Telegram/Supabase); **3b** (следующее)
+— реальный `telegram-auth` Edge Function и персистентность в Supabase.
+
+### Решения
+
+- Стратегия сессии (для 3b) зафиксирована в `architecture.md` 5.1:
+  **Edge Function `telegram-auth` + Admin API** (проверка HMAC initData,
+  детерминированная `auth.users`, возврат сессии, `setSession` на клиенте).
+- Мок ITMO ID — за интерфейсом `services/itmoId.ts`
+  (`fetchItmoIdProfile`), детерминированный по логину; точка замены на
+  реальный SSO. Контракт — в `architecture.md` 5.1.
+- Маршрутизация Mini App — по состоянию профиля (без URL-роутера):
+  loading/error → Splash; нет ИСУ → регистрация; ИСУ есть, ITMO ID не
+  привязан → вход ITMO ID; иначе → главный экран пассажира.
+
+### Что сделано (файлы)
+
+- `src/services/itmoId.ts` — мок ITMO ID: `fetchItmoIdProfile(login,
+  password)`, 5 детерминированных профилей по хэшу логина, аватар через
+  DiceBear по логину, ошибка `ItmoIdEmptyCredentialsError`.
+- `src/services/auth.ts` — интерфейс `AuthBackend` (`authenticate`,
+  `updateProfile`, `signOut`) + **мок-реализация** (localStorage). Экспорт
+  `authBackend` — точка замены на Supabase в 3b.
+- `src/app/auth-context.ts`, `src/app/AuthProvider.tsx`,
+  `src/hooks/useAuth.ts` — контекст/провайдер/хук авторизации
+  (state: loading/error/ready + действия `setIsuNumber`, `linkItmoId`,
+  `updateDescription`, `signOut`, `retry`).
+- `src/app/AppFlow.tsx` — переключение экранов по состоянию; `src/App.tsx`
+  обёрнут в `AuthProvider` + `AppFlow`.
+- Экраны `src/pages/`: `SplashScreen` (6.1), `RegistrationScreen` (6.2,
+  поле ИСУ + валидация `^\d{4,10}$`), `ItmoIdLoginScreen` (логин/пароль,
+  мок-вход), `PassengerHomeScreen` (заглушка профиля + дев-кнопка сброса).
+- UI-примитивы `src/components/ui/`: `input`, `label`, `spinner`;
+  композиционные `src/components/`: `AppScreen`, `BrandMark`.
+  Добавлены в `design_system.md`.
+
+### Не сделано / отложено
+
+- **Часть 3b**: Edge Function `telegram-auth`, чтение `initDataRaw` из
+  Telegram SDK, реальная Supabase-сессия и запись в `public.users`,
+  секреты Edge Function (`TELEGRAM_BOT_TOKEN`, `AUTH_USER_SECRET`).
+- Экран профиля с редактируемым «Описание» (5.8) — на шаге 4.
+- Сборка/линт/прогон не выполнялись локально: в этой среде нет доступа к
+  npm-реестру (нельзя `npm install`). Код 3a написан под существующий
+  tsconfig (strict, `verbatimModuleSyntax`), но требует проверки
+  `npm install && npm run build` и прогон `npm run dev` на машине с сетью.
+
 ## Следующий шаг
 
-**Шаг 3: Telegram-авторизация, регистрация (номер ИСУ) и мок ITMO ID** —
-см. `claude_code_promts.md`, Часть 3.
+**Шаг 3, часть 3b** — реальная Telegram-авторизация: Edge Function
+`telegram-auth` (+ секреты через Management API), Supabase-реализация
+`AuthBackend`, запись `public.users`. См. `architecture.md` 5.1.

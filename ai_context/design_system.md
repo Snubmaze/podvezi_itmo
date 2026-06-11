@@ -105,3 +105,26 @@ Telegram themes).
 - Не использовать произвольные hex-цвета в компонентах — только токены
   из этой таблицы (через Tailwind-классы или CSS-переменные).
 - Адаптация под Telegram Mini Apps (`themeParams`, safe-area) — шаг 10.
+
+## Компоненты (по мере появления)
+
+Базовые примитивы `src/components/ui/` (на базе shadcn/ui, токены выше):
+
+| Компонент | Файл | Назначение |
+|---|---|---|
+| `Button` | `ui/button.tsx` | кнопки (variant: default/outline/secondary/ghost/destructive/link; size: xs/sm/default/lg/icon\*) |
+| `Input` | `ui/input.tsx` | текстовые поля (`h-11`, mobile-friendly), `aria-invalid` для ошибок |
+| `Label` | `ui/label.tsx` | подпись к полю формы |
+| `Spinner` | `ui/spinner.tsx` | индикатор загрузки (lucide `Loader2`, `animate-spin`) |
+
+Композиционные компоненты `src/components/`:
+
+| Компонент | Файл | Назначение |
+|---|---|---|
+| `AppScreen` | `AppScreen.tsx` | мобильный layout экрана (центр. колонка `max-w-md`, отступы) |
+| `BrandMark` | `BrandMark.tsx` | логотип сервиса (иконка авто в фирменном квадрате) |
+
+**Паттерн формы** (экраны регистрации / входа ITMO ID): `Label` + `Input`
+с `aria-invalid`, текст ошибки — `text-sm text-danger-foreground`;
+основная кнопка — `Button size="lg" className="w-full"` со `Spinner` в
+состоянии submitting. Подсказки/демо-пометки — `text-xs text-tertiary`.
