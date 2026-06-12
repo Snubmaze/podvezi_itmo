@@ -123,8 +123,9 @@ export function TripCreateScreen({
             onChangeDestination={setDestinationId}
           />
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
+          {/* min-w-0 на ячейках: иначе нативные date/time-инпуты не дают колонкам ужаться и заезжают друг на друга */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="min-w-0 space-y-1.5">
               <Label htmlFor="trip-create-date">Дата отправления</Label>
               <Input
                 id="trip-create-date"
@@ -134,7 +135,7 @@ export function TripCreateScreen({
                 onChange={(event) => setDate(event.target.value)}
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="min-w-0 space-y-1.5">
               <Label htmlFor="trip-create-time">Время отправления</Label>
               <Input
                 id="trip-create-time"
