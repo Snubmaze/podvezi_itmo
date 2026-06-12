@@ -15,6 +15,7 @@ import type {
   UserPublicProfile,
 } from '@/types/db'
 import type {
+  CoTravelerContact,
   CreateTripInput,
   DriverTripWithDetails,
   TripRequestWithTrip,
@@ -263,6 +264,20 @@ export async function rejectTripRequest(requestId: string): Promise<void> {
     .eq('status', 'pending')
 
   if (error) throw new Error('Не удалось отклонить заявку')
+}
+
+/**
+ * Профиль водителя с контактами (ТЗ 5.5.1) — доступен пассажиру только при
+ * подтверждённом участии в поездке этого водителя (RPC
+ * `get_co_traveler_contact`). Если связи нет — возвращает `null`.
+ */
+export async function getCoTravelerContact(userId: string): Promise<CoTravelerContact | null> {
+  const { data, error } = await supabase
+    .rpc('get_co_traveler_contact', { p_user_id: userId })
+    .maybeSingle()
+
+  if (error) throw new Error('Не удалось загрузить профиль водителя')
+  return data as CoTravelerContact | null
 }
 
 /** Отменяет собственную заявку (только пока она `pending`). */

@@ -52,6 +52,20 @@ export interface TripSearchFilters {
   timeFrom: string | null
 }
 
+/**
+ * Профиль водителя с контактами для подтверждённого пассажира его поездки
+ * (ТЗ 5.5.1, RPC `get_co_traveler_contact`).
+ */
+export interface CoTravelerContact {
+  id: string
+  full_name: string | null
+  avatar_url: string | null
+  course: number | null
+  age: number | null
+  description: string | null
+  telegram_username: string | null
+}
+
 /** Входные данные создания поездки (форма TripCreateScreen, ТЗ 5.4.1). */
 export interface CreateTripInput {
   originId: string

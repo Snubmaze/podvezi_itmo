@@ -78,17 +78,17 @@ export function CoTravelerProfileScreen({
       ) : (
         <>
           <div className="mt-4 flex flex-col items-center gap-3 text-center">
-            <Avatar url={contact.avatarUrl} name={contact.fullName} className="size-20" />
+            <Avatar url={contact.avatar_url} name={contact.full_name} className="size-20" />
             <p className="text-lg font-semibold text-foreground">
-              {contact.fullName ?? 'Студент ИТМО'}
+              {contact.full_name ?? 'Студент ИТМО'}
             </p>
           </div>
 
           <div className="mt-6 divide-y divide-border rounded-xl border border-border bg-card px-4">
             {contact.course != null && <InfoRow label="Курс" value={`${contact.course}`} />}
             {contact.age != null && <InfoRow label="Возраст" value={`${contact.age}`} />}
-            {contact.telegramUsername && (
-              <InfoRow label="Telegram" value={`@${contact.telegramUsername}`} />
+            {contact.telegram_username && (
+              <InfoRow label="Telegram" value={`@${contact.telegram_username}`} />
             )}
           </div>
 
