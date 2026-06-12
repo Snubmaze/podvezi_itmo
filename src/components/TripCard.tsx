@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Car } from 'lucide-react'
 
 import { Avatar } from '@/components/Avatar'
 import { formatTripDate, formatTripTime } from '@/lib/datetime'
@@ -68,6 +68,20 @@ export function TripCard({
               {trip.driver.full_name ?? 'Студент ИТМО'}
             </span>
           )}
+        </div>
+      )}
+
+      {showDriver && trip.vehicle && (
+        <div className="mt-1.5 flex items-center gap-2 text-sm text-muted-foreground">
+          <Car className="size-3.5 shrink-0" />
+          <span className="truncate">
+            {[trip.vehicle.color, trip.vehicle.make, trip.vehicle.model]
+              .filter(Boolean)
+              .join(' ')}
+          </span>
+          <span className="shrink-0 rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-xs tracking-wide uppercase">
+            {trip.vehicle.plate_number}
+          </span>
         </div>
       )}
 

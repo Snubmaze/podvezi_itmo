@@ -165,3 +165,16 @@ export interface UserPublicProfile {
   avatar_url: string | null
   course: number | null
 }
+
+/**
+ * Публичная информация об авто (вью `vehicle_public_info`) — цвет, марка,
+ * модель, госномер для карточки поездки (без `seats_count`/`photo_url`).
+ */
+export interface VehiclePublicInfo {
+  id: string
+  driver_id: string
+  make: string
+  model: string
+  color: string | null
+  plate_number: string
+}

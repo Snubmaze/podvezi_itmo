@@ -10,6 +10,7 @@ import type {
   TripMember,
   TripRequest,
   UserPublicProfile,
+  VehiclePublicInfo,
 } from '@/types/db'
 
 /** Поездка с развёрнутыми точками маршрута и публичным профилем водителя. */
@@ -17,6 +18,8 @@ export interface TripWithRoute extends Trip {
   origin: Location
   destination: Location
   driver: UserPublicProfile | null
+  /** Авто водителя (вью `vehicle_public_info`, по `driver_id`). */
+  vehicle: VehiclePublicInfo | null
 }
 
 /** Заявка пассажира с развёрнутой поездкой ("Мои поездки", вид пассажира). */

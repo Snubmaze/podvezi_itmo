@@ -13,6 +13,7 @@ import type {
   TripMember,
   TripRequest,
   UserPublicProfile,
+  VehiclePublicInfo,
 } from '@/types/db'
 import type {
   CoTravelerContact,
@@ -44,6 +45,28 @@ async function fetchPublicProfiles(
 
   const profiles = data as UserPublicProfile[]
   return new Map(profiles.map((profile) => [profile.id, profile]))
+}
+
+/**
+ * Загружает публичную информацию об авто водителей (вью
+ * `vehicle_public_info`). У водителя по MVP одно авто — для каждого
+ * `driver_id` берётся одна запись.
+ */
+async function fetchDriverVehicles(
+  driverIds: (string | null)[],
+): Promise<Map<string, VehiclePublicInfo>> {
+  const uniqueIds = [...new Set(driverIds.filter((id): id is string => id !== null))]
+  if (uniqueIds.length === 0) return new Map()
+
+  const { data, error } = await supabase
+    .from('vehicle_public_info')
+    .select('*')
+    .in('driver_id', uniqueIds)
+
+  if (error) throw new Error('Не удалось загрузить информацию об авто')
+
+  const vehicles = data as VehiclePublicInfo[]
+  return new Map(vehicles.map((vehicle) => [vehicle.driver_id, vehicle]))
 }
 
 /** Публичный профиль одного пользователя (вью `user_public_profiles`). */
@@ -134,11 +157,16 @@ export async function searchTrips(
   if (error) throw new Error('Не удалось загрузить список поездок')
 
   const trips = data as TripWithLocations[]
-  const profiles = await fetchPublicProfiles(trips.map((trip) => trip.driver_id))
+  const driverIds = trips.map((trip) => trip.driver_id)
+  const [profiles, vehicles] = await Promise.all([
+    fetchPublicProfiles(driverIds),
+    fetchDriverVehicles(driverIds),
+  ])
 
   return trips.map((trip) => ({
     ...trip,
     driver: trip.driver_id ? profiles.get(trip.driver_id) ?? null : null,
+    vehicle: trip.driver_id ? vehicles.get(trip.driver_id) ?? null : null,
   }))
 }
 
@@ -191,6 +219,7 @@ export async function getMyDriverTrips(driverId: string): Promise<DriverTripWith
   return trips.map((trip) => ({
     ...trip,
     driver: null,
+    vehicle: null,
     requests: requests
       .filter((request) => request.trip_id === trip.id)
       .map((request) => ({
@@ -222,13 +251,18 @@ export async function getMyPassengerTrips(passengerId: string): Promise<TripRequ
   const requests = data as (TripRequest & { trip: TripWithLocations })[]
   if (requests.length === 0) return []
 
-  const profiles = await fetchPublicProfiles(requests.map((request) => request.trip.driver_id))
+  const driverIds = requests.map((request) => request.trip.driver_id)
+  const [profiles, vehicles] = await Promise.all([
+    fetchPublicProfiles(driverIds),
+    fetchDriverVehicles(driverIds),
+  ])
 
   return requests.map((request) => ({
     ...request,
     trip: {
       ...request.trip,
       driver: request.trip.driver_id ? profiles.get(request.trip.driver_id) ?? null : null,
+      vehicle: request.trip.driver_id ? vehicles.get(request.trip.driver_id) ?? null : null,
     },
   }))
 }

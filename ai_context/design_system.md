@@ -137,7 +137,7 @@ Telegram themes).
 | `RoleSwitcher` | `RoleSwitcher.tsx` | переключатель активной роли (Пассажир/Водитель-с-замком) |
 | `LocationPicker` | `LocationPicker.tsx` | выбор одной точки маршрута (`Select`): корпуса/общежития сгруппированы, иконки `Building2`/`Home`; выбор только из справочника `locations` |
 | `RouteSelector` | `RouteSelector.tsx` | пара `LocationPicker` «Откуда»/«Куда» + кнопка-свап (`ArrowUpDown`) + сообщение об ошибке, если точки совпадают |
-| `TripCard` | `TripCard.tsx` | карточка поездки: маршрут (`origin → destination`, иконка `ArrowRight`), дата/время, места, цена, опционально водитель (`showDriver`), слот `badge` (статус) и `footer` (действия) |
+| `TripCard` | `TripCard.tsx` | карточка поездки: маршрут (`origin → destination`, иконка `ArrowRight`), дата/время, места, цена, опционально водитель (`showDriver`, имя кликабельно при `onDriverClick`) и его авто (иконка `Car`, «цвет марка модель» + госномер плашкой `bg-muted font-mono uppercase`), слот `badge` (статус) и `footer` (действия) |
 | `TripSearchFilterBar` | `TripSearchFilterBar.tsx` | фильтры поиска поездок — `Input type="date"`/`type="time"` («Дата» / «Время от»), второе поле заблокировано, пока не выбрана дата |
 
 Статус верификации водителя → бейдж: хелпер `src/lib/verification.ts`
