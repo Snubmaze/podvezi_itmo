@@ -46,6 +46,18 @@ async function fetchPublicProfiles(
   return new Map(profiles.map((profile) => [profile.id, profile]))
 }
 
+/** Публичный профиль одного пользователя (вью `user_public_profiles`). */
+export async function getPublicProfile(userId: string): Promise<UserPublicProfile | null> {
+  const { data, error } = await supabase
+    .from('user_public_profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error) throw new Error('Не удалось загрузить профиль пользователя')
+  return data as UserPublicProfile | null
+}
+
 /** Создаёт поездку (ТЗ 5.4.1). `vehicle_id` пока не используется (шаг 7). */
 export async function createTrip(driverId: string, input: CreateTripInput): Promise<Trip> {
   const routeValidation = validateRoutePair(input.originId, input.destinationId)

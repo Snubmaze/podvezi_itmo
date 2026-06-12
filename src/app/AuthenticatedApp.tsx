@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import type { ActiveRole } from '@/components/RoleSwitcher'
 import { AdminModerationScreen } from '@/pages/AdminModerationScreen'
+import { CoTravelerProfileScreen } from '@/pages/CoTravelerProfileScreen'
 import { DriverRegistrationScreen } from '@/pages/DriverRegistrationScreen'
 import { HomeScreen } from '@/pages/HomeScreen'
 import { MyTripsScreen } from '@/pages/MyTripsScreen'
@@ -16,11 +17,22 @@ type View =
   | 'my-trips'
   | 'driver-verify'
   | 'admin'
+  | 'driver-profile'
 
 /** Оболочка авторизованной части: навигация между главным экраном, профилем и поездками. */
 export function AuthenticatedApp({ user }: { user: User }) {
   const [view, setView] = useState<View>('home')
   const [activeRole, setActiveRole] = useState<ActiveRole>('passenger')
+  /** Водитель, чей профиль открыт, и экран для возврата по «Назад». */
+  const [driverProfile, setDriverProfile] = useState<{
+    userId: string
+    from: View
+  } | null>(null)
+
+  const openDriverProfile = (from: View) => (userId: string) => {
+    setDriverProfile({ userId, from })
+    setView('driver-profile')
+  }
 
   if (view === 'profile') {
     return (
@@ -45,7 +57,20 @@ export function AuthenticatedApp({ user }: { user: User }) {
   }
   if (view === 'my-trips') {
     return (
-      <MyTripsScreen user={user} activeRole={activeRole} onBack={() => setView('home')} />
+      <MyTripsScreen
+        user={user}
+        activeRole={activeRole}
+        onBack={() => setView('home')}
+        onOpenDriverProfile={openDriverProfile('my-trips')}
+      />
+    )
+  }
+  if (view === 'driver-profile' && driverProfile) {
+    return (
+      <CoTravelerProfileScreen
+        userId={driverProfile.userId}
+        onBack={() => setView(driverProfile.from)}
+      />
     )
   }
   if (view === 'driver-verify') {
@@ -66,6 +91,7 @@ export function AuthenticatedApp({ user }: { user: User }) {
       onCreateTrip={() => setView('trip-create')}
       onMyTrips={() => setView('my-trips')}
       onVerifyDriver={() => setView('driver-verify')}
+      onOpenDriverProfile={openDriverProfile('home')}
     />
   )
 }

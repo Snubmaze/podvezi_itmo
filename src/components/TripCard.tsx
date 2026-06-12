@@ -14,12 +14,15 @@ import type { TripWithRoute } from '@/types/trips'
 export function TripCard({
   trip,
   showDriver = false,
+  onDriverClick,
   badge,
   footer,
   className,
 }: {
   trip: TripWithRoute
   showDriver?: boolean
+  /** Если задан — имя водителя кликабельно и открывает его профиль. */
+  onDriverClick?: (driverId: string) => void
   badge?: ReactNode
   footer?: ReactNode
   className?: string
@@ -52,9 +55,19 @@ export function TripCard({
             name={trip.driver.full_name}
             className="size-7 text-xs"
           />
-          <span className="text-sm text-foreground">
-            {trip.driver.full_name ?? 'Студент ИТМО'}
-          </span>
+          {onDriverClick ? (
+            <button
+              type="button"
+              onClick={() => onDriverClick(trip.driver!.id)}
+              className="rounded-sm text-sm text-foreground underline decoration-muted-foreground/50 underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              {trip.driver.full_name ?? 'Студент ИТМО'}
+            </button>
+          ) : (
+            <span className="text-sm text-foreground">
+              {trip.driver.full_name ?? 'Студент ИТМО'}
+            </span>
+          )}
         </div>
       )}
 

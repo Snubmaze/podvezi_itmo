@@ -152,9 +152,11 @@ function DriverTrips({ user }: { user: User }) {
 function PassengerRequestCard({
   request,
   onActed,
+  onOpenDriverProfile,
 }: {
   request: TripRequestWithTrip
   onActed: () => void
+  onOpenDriverProfile: (userId: string) => void
 }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -177,6 +179,7 @@ function PassengerRequestCard({
     <TripCard
       trip={request.trip}
       showDriver
+      onDriverClick={onOpenDriverProfile}
       badge={<Badge variant={badge.variant}>{badge.label}</Badge>}
       footer={
         <div className="space-y-1.5">
@@ -194,7 +197,13 @@ function PassengerRequestCard({
 }
 
 /** Список заявок текущего пользователя как пассажира. */
-function PassengerTrips({ user }: { user: User }) {
+function PassengerTrips({
+  user,
+  onOpenDriverProfile,
+}: {
+  user: User
+  onOpenDriverProfile: (userId: string) => void
+}) {
   const { requests, loading, error, refetch } = useMyPassengerTrips(user.id)
 
   if (loading) {
@@ -215,7 +224,12 @@ function PassengerTrips({ user }: { user: User }) {
   return (
     <div className="mt-6 space-y-3">
       {requests.map((request) => (
-        <PassengerRequestCard key={request.id} request={request} onActed={refetch} />
+        <PassengerRequestCard
+          key={request.id}
+          request={request}
+          onActed={refetch}
+          onOpenDriverProfile={onOpenDriverProfile}
+        />
       ))}
     </div>
   )
@@ -226,10 +240,12 @@ export function MyTripsScreen({
   user,
   activeRole,
   onBack,
+  onOpenDriverProfile,
 }: {
   user: User
   activeRole: ActiveRole
   onBack: () => void
+  onOpenDriverProfile: (userId: string) => void
 }) {
   return (
     <AppScreen>
@@ -245,7 +261,11 @@ export function MyTripsScreen({
         <h1 className="text-lg font-semibold text-foreground">Мои поездки</h1>
       </header>
 
-      {activeRole === 'driver' ? <DriverTrips user={user} /> : <PassengerTrips user={user} />}
+      {activeRole === 'driver' ? (
+        <DriverTrips user={user} />
+      ) : (
+        <PassengerTrips user={user} onOpenDriverProfile={onOpenDriverProfile} />
+      )}
     </AppScreen>
   )
 }

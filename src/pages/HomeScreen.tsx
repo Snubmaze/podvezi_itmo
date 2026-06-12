@@ -26,10 +26,12 @@ function TripSearchResultCard({
   user,
   trip,
   onJoined,
+  onOpenDriverProfile,
 }: {
   user: User
   trip: TripWithRoute
   onJoined: () => void
+  onOpenDriverProfile: (userId: string) => void
 }) {
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(
@@ -58,6 +60,7 @@ function TripSearchResultCard({
     <TripCard
       trip={trip}
       showDriver
+      onDriverClick={onOpenDriverProfile}
       footer={
         <div className="space-y-1.5">
           <Button
@@ -91,10 +94,12 @@ function PassengerTripSearch({
   user,
   originId,
   destinationId,
+  onOpenDriverProfile,
 }: {
   user: User
   originId: string | null
   destinationId: string | null
+  onOpenDriverProfile: (userId: string) => void
 }) {
   const [date, setDate] = useState<string | null>(null)
   const [timeFrom, setTimeFrom] = useState<string | null>(null)
@@ -124,7 +129,13 @@ function PassengerTripSearch({
       ) : (
         <div className="space-y-3">
           {trips.map((trip) => (
-            <TripSearchResultCard key={trip.id} user={user} trip={trip} onJoined={refetch} />
+            <TripSearchResultCard
+              key={trip.id}
+              user={user}
+              trip={trip}
+              onJoined={refetch}
+              onOpenDriverProfile={onOpenDriverProfile}
+            />
           ))}
         </div>
       )}
@@ -140,6 +151,7 @@ export function HomeScreen({
   onCreateTrip,
   onMyTrips,
   onVerifyDriver,
+  onOpenDriverProfile,
 }: {
   user: User
   activeRole: ActiveRole
@@ -148,6 +160,7 @@ export function HomeScreen({
   onCreateTrip: () => void
   onMyTrips: () => void
   onVerifyDriver: () => void
+  onOpenDriverProfile: (userId: string) => void
 }) {
   const canDrive = user.driver_verification_status === 'approved'
   const [modalOpen, setModalOpen] = useState(false)
@@ -219,6 +232,7 @@ export function HomeScreen({
                   user={user}
                   originId={originId}
                   destinationId={destinationId}
+                  onOpenDriverProfile={onOpenDriverProfile}
                 />
               </>
             )}
