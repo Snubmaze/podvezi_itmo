@@ -105,6 +105,11 @@ Telegram themes).
 - Не использовать произвольные hex-цвета в компонентах — только токены
   из этой таблицы (через Tailwind-классы или CSS-переменные).
 - Адаптация под Telegram Mini Apps (`themeParams`, safe-area) — шаг 10.
+- Нативные `input[type=date]`/`input[type=time]`: глобально в
+  `src/index.css` (`@layer base`) сброшен `appearance` (iOS WebKit иначе
+  не даёт полю ужаться под колонку грида) и выровнено значение влево
+  (`::-webkit-date-and-time-value`). В разметке ячейкам грида с такими
+  полями нужен `min-w-0`.
 
 ## Компоненты (по мере появления)
 
