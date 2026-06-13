@@ -121,9 +121,9 @@ export async function createTrip(driverId: string, input: CreateTripInput): Prom
 
 /**
  * Поиск активных поездок с фильтрами (ТЗ 5.7): точка отправления/
- * назначения, дата, время. Если `excludeDriverId` задан — поездки этого
- * водителя исключаются (не предлагать пассажиру присоединиться к своей же
- * поездке).
+ * назначения, дата, время. Если `excludeDriverId` задан (id текущего
+ * пользователя) — исключаются его собственные поездки как водителя и
+ * поездки, на которые он уже подал заявку (`pending`/`accepted`).
  *
  * Семантика дата/время: если `date` не задан — только будущие поездки
  * (`departure_time >= now`), `timeFrom` без `date` игнорируется. Если
@@ -142,7 +142,24 @@ export async function searchTrips(
 
   if (filters.originId) query = query.eq('origin_id', filters.originId)
   if (filters.destinationId) query = query.eq('destination_id', filters.destinationId)
-  if (excludeDriverId) query = query.neq('driver_id', excludeDriverId)
+
+  if (excludeDriverId) {
+    query = query.neq('driver_id', excludeDriverId)
+
+    // Скрываем поездки, на которые пользователь уже подал заявку
+    // (`pending`/`accepted`) — чтобы не предлагать присоединиться повторно.
+    const { data: requested, error: requestedError } = await supabase
+      .from('trip_requests')
+      .select('trip_id')
+      .eq('passenger_id', excludeDriverId)
+      .in('status', ['pending', 'accepted'])
+    if (requestedError) throw new Error('Не удалось загрузить ваши заявки')
+
+    const requestedTripIds = (requested as { trip_id: string }[]).map((r) => r.trip_id)
+    if (requestedTripIds.length > 0) {
+      query = query.not('id', 'in', `(${requestedTripIds.join(',')})`)
+    }
+  }
 
   if (filters.date) {
     const from = filters.timeFrom

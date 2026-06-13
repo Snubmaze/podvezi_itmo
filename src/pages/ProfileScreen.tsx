@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/hooks/useAuth'
-import { verificationBadge } from '@/lib/verification'
+import { profileRoleBadge } from '@/lib/verification'
 import { devSetMockDriverStatus, devSetMockRole } from '@/services/auth'
 import { getDriverApplication } from '@/services/driver'
 import type { User } from '@/types/db'
@@ -37,7 +37,7 @@ export function ProfileScreen({
   const [description, setDescription] = useState(user.description ?? '')
   const [saving, setSaving] = useState(false)
   const dirty = description !== (user.description ?? '')
-  const badge = verificationBadge(user.driver_verification_status)
+  const badge = profileRoleBadge(user)
   const [rejectionReason, setRejectionReason] = useState<string | null>(null)
 
   // Причина отклонения (если админ её указал — шаг 8).
