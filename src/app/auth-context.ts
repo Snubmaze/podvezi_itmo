@@ -20,8 +20,12 @@ export interface AuthContextValue {
   updateDescription: (description: string) => Promise<void>
   /** Перечитать профиль из источника (после подачи заявки на верификацию и т.п.). */
   reloadUser: () => Promise<void>
-  /** Сбросить сессию (дев-режим / повторное прохождение флоу). */
-  signOut: () => Promise<void>
+  /**
+   * Выход из аккаунта = отвязка: сбрасывает привязку (ИСУ + ITMO ID) и
+   * возвращает к онбордингу. В TG авторизация автоматическая, поэтому именно
+   * отвязка — осмысленный «выход» (см. architecture.md 5.1).
+   */
+  logout: () => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

@@ -3,6 +3,7 @@ import { ChevronLeft, LogOut, ShieldCheck } from 'lucide-react'
 
 import { AppScreen } from '@/components/AppScreen'
 import { Avatar } from '@/components/Avatar'
+import { Modal } from '@/components/Modal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -33,12 +34,13 @@ export function ProfileScreen({
   onBack: () => void
   onOpenAdmin: () => void
 }) {
-  const { updateDescription, signOut, retry } = useAuth()
+  const { updateDescription, logout, retry } = useAuth()
   const [description, setDescription] = useState(user.description ?? '')
   const [saving, setSaving] = useState(false)
   const dirty = description !== (user.description ?? '')
   const badge = profileRoleBadge(user)
   const [rejectionReason, setRejectionReason] = useState<string | null>(null)
+  const [confirmLogout, setConfirmLogout] = useState(false)
 
   // Причина отклонения (если админ её указал — шаг 8).
   useEffect(() => {
@@ -175,12 +177,34 @@ export function ProfileScreen({
           variant="ghost"
           size="lg"
           className="w-full text-destructive"
-          onClick={() => void signOut()}
+          onClick={() => setConfirmLogout(true)}
         >
           <LogOut className="size-4" />
-          Выйти
+          Выйти из аккаунта
         </Button>
       </div>
+
+      <Modal
+        open={confirmLogout}
+        onClose={() => setConfirmLogout(false)}
+        title="Выйти из аккаунта?"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Привязка номера ИСУ и ITMO ID будет сброшена — потребуется войти
+            заново. Статус верификации водителя сохранится.
+          </p>
+          <Button
+            variant="destructive"
+            size="lg"
+            className="w-full"
+            onClick={() => void logout()}
+          >
+            <LogOut className="size-4" />
+            Выйти
+          </Button>
+        </div>
+      </Modal>
     </AppScreen>
   )
 }

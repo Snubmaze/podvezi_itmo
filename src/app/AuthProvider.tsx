@@ -73,7 +73,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ status: 'ready', user })
   }, [])
 
-  const signOut = useCallback(async () => {
+  // Выход = отвязка: сбрасываем привязку ИСУ + ITMO ID (статус водителя и роль
+  // не трогаем — их меняет только админ) и заново запускаем онбординг.
+  const logout = useCallback(async () => {
+    try {
+      await authBackend.updateProfile({
+        isu_number: null,
+        itmo_id_linked: false,
+        full_name: null,
+        course: null,
+        age: null,
+        avatar_url: null,
+      })
+    } catch {
+      // даже если сброс полей не удался — всё равно завершаем сессию
+    }
     await authBackend.signOut()
     setState({ status: 'loading' })
     runAuth({ cancelled: false })
@@ -88,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         linkItmoId,
         updateDescription,
         reloadUser,
-        signOut,
+        logout,
       }}
     >
       {children}
