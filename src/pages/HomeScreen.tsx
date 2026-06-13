@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { AppScreen } from '@/components/AppScreen'
 import { Avatar } from '@/components/Avatar'
 import { DriverVerificationModal } from '@/components/DriverVerificationModal'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { RoleSwitcher, type ActiveRole } from '@/components/RoleSwitcher'
 import { RouteSelector } from '@/components/RouteSelector'
 import { TripCard } from '@/components/TripCard'
@@ -182,14 +183,17 @@ export function HomeScreen({
             {givenName(user.full_name)}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onOpenProfile}
-          aria-label="Открыть профиль"
-          className="shrink-0 rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <Avatar url={user.avatar_url} name={user.full_name} className="size-11" />
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            aria-label="Открыть профиль"
+            className="rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <Avatar url={user.avatar_url} name={user.full_name} className="size-11" />
+          </button>
+        </div>
       </header>
 
       <div className="mt-5">
