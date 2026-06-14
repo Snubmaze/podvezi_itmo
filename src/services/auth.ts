@@ -1,13 +1,10 @@
 /**
- * Доменный сервис авторизации/профиля.
+ * Доменный сервис авторизации/профиля. Аккаунт = номер ИСУ (см.
+ * architecture.md 5.1): вход по ИСУ, смена ИСУ = смена аккаунта.
  *
- * UI и хуки работают ТОЛЬКО через интерфейс `AuthBackend`. На шаге 3a
- * используется мок-реализация (in-memory + localStorage, без Telegram и
- * Supabase) — чтобы прокликать весь флоу при разработке/демо.
- *
- * Часть 3b заменит мок на Supabase-реализацию (Edge Function `telegram-auth`
- * + `supabase.auth.setSession` + чтение/запись `public.users`), не меняя
- * сигнатуры интерфейса. Точка замены — экспорт `authBackend` внизу файла.
+ * UI и хуки работают ТОЛЬКО через интерфейс `AuthBackend`. В Telegram —
+ * Supabase-реализация (Edge Function `telegram-auth` ключит по ИСУ), в
+ * браузере (дев/демо) — мок (аккаунты в localStorage по ИСУ).
  */
 
 import { supabase } from '@/lib/supabase'
@@ -15,39 +12,59 @@ import { getInitDataRaw, isTelegramEnv } from '@/lib/telegram'
 import type { DriverVerificationStatus, User, UserRole } from '@/types/db'
 
 export interface AuthBackend {
-  /** Boot/авторизация: вернуть текущего пользователя (создав при первом входе). */
-  authenticate(): Promise<User>
-  /** Частичное обновление профиля (ИСУ, привязка ITMO ID, описание и т.п.). */
+  /** Текущий аккаунт по активной сессии; null — сессии нет (нужен ввод ИСУ). */
+  authenticate(): Promise<User | null>
+  /** Вход по номеру ИСУ (создаёт аккаунт при первом входе). */
+  loginWithIsu(isu: string): Promise<User>
+  /** Частичное обновление профиля (привязка ITMO ID, описание и т.п.). */
   updateProfile(patch: Partial<User>): Promise<User>
-  /** Сброс сессии (для дев-режима / повторного прохождения флоу). */
-  signOut(): Promise<void>
+  /** Выход: завершить сессию (данные аккаунта сохраняются). */
+  logout(): Promise<void>
 }
 
-// --- Мок-реализация (шаг 3a) ---------------------------------------------
+// --- Мок-реализация (аккаунты по ИСУ в localStorage) ---------------------
 
-const MOCK_STORAGE_KEY = 'podvezi.mock.user'
+const MOCK_ACCOUNTS_KEY = 'podvezi.mock.accounts'
+const MOCK_CURRENT_KEY = 'podvezi.mock.currentIsu'
 
-function loadStoredUser(): User | null {
+function loadAccounts(): Record<string, User> {
   try {
-    const raw = localStorage.getItem(MOCK_STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as User) : null
+    const raw = localStorage.getItem(MOCK_ACCOUNTS_KEY)
+    return raw ? (JSON.parse(raw) as Record<string, User>) : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveAccounts(accounts: Record<string, User>): void {
+  localStorage.setItem(MOCK_ACCOUNTS_KEY, JSON.stringify(accounts))
+}
+
+function getCurrentIsu(): string | null {
+  try {
+    return localStorage.getItem(MOCK_CURRENT_KEY)
   } catch {
     return null
   }
 }
 
-function storeUser(user: User): void {
-  localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(user))
+function setCurrentIsu(isu: string | null): void {
+  try {
+    if (isu === null) localStorage.removeItem(MOCK_CURRENT_KEY)
+    else localStorage.setItem(MOCK_CURRENT_KEY, isu)
+  } catch {
+    // localStorage недоступен — игнорируем
+  }
 }
 
-function createMockUser(): User {
+function createMockUser(isu: string): User {
   const now = new Date().toISOString()
   return {
     id: crypto.randomUUID(),
     telegram_id: 100_000_000 + Math.floor(Math.random() * 900_000_000),
     telegram_username: 'dev_user',
     full_name: null,
-    isu_number: null,
+    isu_number: isu,
     itmo_id_linked: false,
     course: null,
     age: null,
@@ -61,6 +78,19 @@ function createMockUser(): User {
   }
 }
 
+function loadCurrentMockUser(): User | null {
+  const isu = getCurrentIsu()
+  if (!isu) return null
+  return loadAccounts()[isu] ?? null
+}
+
+function storeMockUser(user: User): void {
+  if (!user.isu_number) return
+  const accounts = loadAccounts()
+  accounts[user.isu_number] = user
+  saveAccounts(accounts)
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -68,63 +98,73 @@ function delay(ms: number): Promise<void> {
 function createMockAuthBackend(): AuthBackend {
   return {
     async authenticate() {
-      await delay(700) // имитация авторизации через Telegram
-      const existing = loadStoredUser()
-      if (existing) return existing
-      const user = createMockUser()
-      storeUser(user)
+      await delay(500)
+      return loadCurrentMockUser()
+    },
+
+    async loginWithIsu(isu) {
+      await delay(500)
+      const accounts = loadAccounts()
+      const user = accounts[isu] ?? createMockUser(isu)
+      accounts[isu] = user
+      saveAccounts(accounts)
+      setCurrentIsu(isu)
       return user
     },
 
     async updateProfile(patch) {
-      await delay(300)
-      const current = loadStoredUser() ?? createMockUser()
+      await delay(200)
+      const current = loadCurrentMockUser()
+      if (!current) throw new Error('Нет активного аккаунта')
       const updated: User = {
         ...current,
         ...patch,
         updated_at: new Date().toISOString(),
       }
-      storeUser(updated)
+      storeMockUser(updated)
       return updated
     },
 
-    async signOut() {
-      localStorage.removeItem(MOCK_STORAGE_KEY)
+    async logout() {
+      setCurrentIsu(null)
     },
   }
 }
 
-/**
- * DEV-only: подменяет статус верификации мок-пользователя в localStorage,
- * чтобы локально прокликать водительский флоу без Telegram/админа.
- * В Supabase-режиме статус ставит только админ (см. architecture.md 5.1.1).
- */
+/** DEV-only: подмена статуса верификации текущего мок-аккаунта. */
 export function devSetMockDriverStatus(status: DriverVerificationStatus): void {
-  const user = loadStoredUser()
+  const user = loadCurrentMockUser()
   if (!user) return
-  storeUser({
+  storeMockUser({
     ...user,
     driver_verification_status: status,
     updated_at: new Date().toISOString(),
   })
 }
 
-/**
- * DEV-only: подменяет роль мок-пользователя в localStorage (для проверки
- * админ-панели локально). В Supabase-режиме роль `admin` назначается в БД.
- */
+/** DEV-only: подмена роли текущего мок-аккаунта (для проверки админки). */
 export function devSetMockRole(role: UserRole): void {
-  const user = loadStoredUser()
+  const user = loadCurrentMockUser()
   if (!user) return
-  storeUser({ ...user, role, updated_at: new Date().toISOString() })
+  storeMockUser({ ...user, role, updated_at: new Date().toISOString() })
 }
 
-// --- Supabase-реализация (шаг 3b) ----------------------------------------
+// --- Supabase-реализация (Telegram) --------------------------------------
 
 interface TelegramAuthResponse {
   access_token: string
   refresh_token: string
   is_new_user: boolean
+}
+
+async function loadProfile(userId: string): Promise<User | null> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single()
+  if (error || !data) return null
+  return data as User
 }
 
 function createSupabaseAuthBackend(): AuthBackend {
@@ -133,39 +173,32 @@ function createSupabaseAuthBackend(): AuthBackend {
       const {
         data: { session },
       } = await supabase.auth.getSession()
-      let activeSession = session
+      if (!session) return null
+      return loadProfile(session.user.id)
+    },
 
-      if (!activeSession) {
-        const initDataRaw = getInitDataRaw()
-        if (!initDataRaw) {
-          throw new Error('Откройте приложение из Telegram')
-        }
-        const { data, error } = await supabase.functions.invoke<TelegramAuthResponse>(
-          'telegram-auth',
-          { body: { initDataRaw } },
-        )
-        if (error || !data) {
-          throw new Error('Не удалось авторизоваться через Telegram')
-        }
-        const { data: setData, error: setError } = await supabase.auth.setSession({
-          access_token: data.access_token,
-          refresh_token: data.refresh_token,
-        })
-        if (setError || !setData.session) {
-          throw new Error('Не удалось установить сессию')
-        }
-        activeSession = setData.session
+    async loginWithIsu(isu) {
+      const initDataRaw = getInitDataRaw()
+      if (!initDataRaw) {
+        throw new Error('Откройте приложение из Telegram')
       }
-
-      const { data: profile, error: profileError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', activeSession.user.id)
-        .single()
-      if (profileError || !profile) {
-        throw new Error('Не удалось загрузить профиль')
+      const { data, error } = await supabase.functions.invoke<TelegramAuthResponse>(
+        'telegram-auth',
+        { body: { initDataRaw, isu } },
+      )
+      if (error || !data) {
+        throw new Error('Не удалось войти. Проверьте номер ИСУ.')
       }
-      return profile as User
+      const { data: setData, error: setError } = await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      })
+      if (setError || !setData.session) {
+        throw new Error('Не удалось установить сессию')
+      }
+      const profile = await loadProfile(setData.session.user.id)
+      if (!profile) throw new Error('Не удалось загрузить профиль')
+      return profile
     },
 
     async updateProfile(patch) {
@@ -184,7 +217,7 @@ function createSupabaseAuthBackend(): AuthBackend {
       return data as User
     },
 
-    async signOut() {
+    async logout() {
       await supabase.auth.signOut()
     },
   }

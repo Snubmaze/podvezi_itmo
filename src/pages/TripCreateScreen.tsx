@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { ChevronLeft } from 'lucide-react'
-
 import { AppScreen } from '@/components/AppScreen'
+import { ScreenHeader } from '@/components/ScreenHeader'
 import { RouteSelector } from '@/components/RouteSelector'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -94,17 +93,7 @@ export function TripCreateScreen({
 
   return (
     <AppScreen>
-      <header className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Назад"
-          className="-ml-2 rounded-md p-1.5 text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="size-5" />
-        </button>
-        <h1 className="text-lg font-semibold text-foreground">Создать поездку</h1>
-      </header>
+      <ScreenHeader title="Создать поездку" onBack={onBack} />
 
       {locationsLoading ? (
         <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">

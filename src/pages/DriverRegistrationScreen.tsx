@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
-import { Check, ChevronLeft, Upload } from 'lucide-react'
+import { Check, Upload } from 'lucide-react'
 
 import { AppScreen } from '@/components/AppScreen'
+import { ScreenHeader } from '@/components/ScreenHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -160,17 +161,7 @@ export function DriverRegistrationScreen({
 
   return (
     <AppScreen>
-      <header className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Назад"
-          className="-ml-2 rounded-md p-1.5 text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="size-5" />
-        </button>
-        <h1 className="text-lg font-semibold text-foreground">Заявка водителя</h1>
-      </header>
+      <ScreenHeader title="Заявка водителя" onBack={onBack} />
 
       <p className="mt-2 text-sm text-muted-foreground">
         Укажите данные автомобиля и загрузите документы — заявку проверит

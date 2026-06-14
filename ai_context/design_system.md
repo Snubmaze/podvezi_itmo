@@ -152,3 +152,51 @@ Telegram themes).
 с `aria-invalid`, текст ошибки — `text-sm text-danger-foreground`;
 основная кнопка — `Button size="lg" className="w-full"` со `Spinner` в
 состоянии submitting. Подсказки/демо-пометки — `text-xs text-tertiary`.
+
+## Тёмная тема и переключатель
+
+- **Источник темы**: `src/lib/theme.ts` — `getSystemTheme()` (приоритет:
+  `Telegram.WebApp.colorScheme` → `prefers-color-scheme`) и
+  `subscribeSystemTheme()`. Ручной выбор хранится в localStorage
+  (`podvezi.theme`).
+- **`ThemeProvider`** (`src/app/ThemeProvider.tsx`) вычисляет активную тему
+  (`override ?? system`) и вешает класс `dark` на `<html>` → активируются
+  `.dark`-токены из `src/index.css`. Хук `useTheme()` → `{ theme, toggle }`.
+- **`ThemeToggle`** (`src/components/ThemeToggle.tsx`) — иконка солнце/луна;
+  размещена в шапке главного экрана (слева от аватара).
+- Тёмные значения токенов в `.dark` (`src/index.css`) — рабочий вариант
+  (черновик из шага 1, при необходимости уточняется).
+
+## Экран входа ITMO ID
+
+Оформлен под реальный экран ITMO ID: центрированная карточка
+(`rounded-3xl bg-card shadow-xl`, `max-w-sm`), заголовок «ITMO ID», поля
+`Логин` (декоративные иконки `KeyRound`+`ChevronDown` справа) и `Пароль`
+(тоггл показа `Eye`/`EyeOff`), ссылка «Забыли пароль?» — некликабельная
+заглушка. Основная кнопка «Вход» — инвертированная (`bg-foreground
+text-background`). Блок «или войдите с помощью» + VK/Яндекс —
+**некликабельные заглушки** (бренд-цвета через inline-`style`, вне токенов).
+Без «Регистрация» и «Запомнить меня».
+
+## Лейбл роли в профиле
+
+`src/lib/verification.ts#profileRoleBadge(user)` → `{ label, variant }`:
+`Админ` / `Водитель` (approved) / `В процессе верификации` (pending) /
+`Пассажир` (иначе). `Badge` поддерживает вариант `primary` (для «Админ»).
+
+## ITMO-стиль (единый редизайн)
+
+Визуальный язык под референсы ITMO ID / myitmo:
+
+- **Радиус** — `--radius: 0.875rem` (мягкие углы; влияет на все `rounded-*`).
+- **Поля ввода** (`Input`, `Textarea`) — «filled»-стиль: `bg-muted`,
+  `border-transparent`, `rounded-xl`, выше (`h-12`); на фокусе — `bg-card` +
+  кольцо. Применяется во всех формах.
+- **`Card`** (`ui/card.tsx`) — базовая карточка `rounded-2xl border bg-card
+  p-4`; основной контейнер секций.
+- **`ScreenHeader`** (`ScreenHeader.tsx`) — единая шапка экрана (кнопка
+  «Назад» + заголовок + опц. действие справа). Используется на всех
+  вложенных экранах.
+- **Онбординг** (Регистрация, вход ITMO ID) — центрированная карточка
+  `rounded-3xl bg-card shadow-xl max-w-sm`.
+- Все цвета — через токены (light/dark), кроме бренд-заглушек VK/Яндекс.

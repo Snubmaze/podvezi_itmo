@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft } from 'lucide-react'
-
 import { AppScreen } from '@/components/AppScreen'
+import { ScreenHeader } from '@/components/ScreenHeader'
 import { Avatar } from '@/components/Avatar'
 import { Spinner } from '@/components/ui/spinner'
 import { getCoTravelerContact, getPublicProfile } from '@/services/trips'
@@ -69,17 +68,7 @@ export function CoTravelerProfileScreen({
 
   return (
     <AppScreen>
-      <header className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Назад"
-          className="-ml-2 rounded-md p-1.5 text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="size-5" />
-        </button>
-        <h1 className="text-lg font-semibold text-foreground">Профиль водителя</h1>
-      </header>
+      <ScreenHeader title="Профиль водителя" onBack={onBack} />
 
       {loading ? (
         <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">

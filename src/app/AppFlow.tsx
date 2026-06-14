@@ -7,9 +7,9 @@ import { SplashScreen } from '@/pages/SplashScreen'
 /**
  * Маршрутизация по состоянию авторизации/профиля (Mini App — без URL-роутера):
  *   loading/error → Splash
- *   нет ИСУ        → регистрация (6.2)
- *   ИСУ есть, ITMO ID не привязан → вход ITMO ID
- *   профиль готов  → главный экран пассажира
+ *   needs-isu      → вход по номеру ИСУ (аккаунт = ИСУ)
+ *   ITMO ID не привязан → мок-вход ITMO ID
+ *   профиль готов  → главный экран
  */
 export function AppFlow() {
   const { state, retry } = useAuth()
@@ -20,11 +20,11 @@ export function AppFlow() {
   if (state.status === 'error') {
     return <SplashScreen error={state.message} onRetry={retry} />
   }
-
-  const { user } = state
-  if (!user.isu_number) {
+  if (state.status === 'needs-isu') {
     return <RegistrationScreen />
   }
+
+  const { user } = state
   if (!user.itmo_id_linked) {
     return <ItmoIdLoginScreen />
   }

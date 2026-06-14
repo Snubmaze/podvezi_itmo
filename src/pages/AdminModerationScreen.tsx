@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { ChevronLeft } from 'lucide-react'
 
 import { AppScreen } from '@/components/AppScreen'
 import { ImageLightbox } from '@/components/ImageLightbox'
 import { Modal } from '@/components/Modal'
+import { ScreenHeader } from '@/components/ScreenHeader'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
@@ -189,17 +189,7 @@ export function AdminModerationScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <AppScreen>
-      <header className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Назад"
-          className="-ml-2 rounded-md p-1.5 text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="size-5" />
-        </button>
-        <h1 className="text-lg font-semibold text-foreground">Модерация заявок</h1>
-      </header>
+      <ScreenHeader title="Модерация заявок" onBack={onBack} />
 
       <div className="mt-4 space-y-3">
         {loading ? (

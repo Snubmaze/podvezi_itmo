@@ -9,6 +9,7 @@ import { RouteSelector } from '@/components/RouteSelector'
 import { TripCard } from '@/components/TripCard'
 import { TripSearchFilterBar } from '@/components/TripSearchFilterBar'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { useLocations } from '@/hooks/useLocations'
 import { useTripSearch } from '@/hooks/useTripSearch'
@@ -205,7 +206,7 @@ export function HomeScreen({
         />
       </div>
 
-      <div className="mt-6 rounded-xl border border-border bg-card p-5">
+      <Card className="mt-6 p-5">
         {activeRole === 'passenger' ? (
           <>
             <div className="flex items-center justify-between gap-3">
@@ -257,7 +258,7 @@ export function HomeScreen({
             </div>
           </>
         )}
-      </div>
+      </Card>
 
       <DriverVerificationModal
         open={modalOpen}

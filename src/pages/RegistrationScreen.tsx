@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react'
 
-import { AppScreen } from '@/components/AppScreen'
 import { BrandMark } from '@/components/BrandMark'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,11 +11,11 @@ import { useAuth } from '@/hooks/useAuth'
 const ISU_PATTERN = /^\d{4,10}$/
 
 /**
- * Экран регистрации нового пользователя (ТЗ 6.2, упрощённый): только поле
- * «Номер ИСУ». ФИО здесь не запрашивается — оно придёт из мок ITMO ID.
+ * Экран входа по номеру ИСУ (аккаунт = ИСУ; см. architecture.md 5.1). При
+ * первом входе аккаунт создаётся, при повторном — открывается существующий.
  */
 export function RegistrationScreen() {
-  const { setIsuNumber } = useAuth()
+  const { loginWithIsu } = useAuth()
   const [isu, setIsu] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -31,53 +30,57 @@ export function RegistrationScreen() {
     setError(null)
     setSubmitting(true)
     try {
-      await setIsuNumber(value)
-      // Дальше флоу сам переключится на экран входа через ITMO ID.
-    } catch {
-      setError('Не удалось сохранить номер ИСУ. Попробуйте ещё раз.')
+      await loginWithIsu(value)
+      // Дальше флоу сам переключится (ITMO ID или главный экран).
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось войти. Попробуйте ещё раз.')
       setSubmitting(false)
     }
   }
 
   return (
-    <AppScreen>
-      <div className="flex flex-col gap-2 pt-4">
-        <BrandMark />
-        <h1 className="mt-4 text-2xl font-semibold text-foreground">Регистрация</h1>
-        <p className="text-sm text-muted-foreground">
-          Укажите ваш номер ИСУ, чтобы продолжить. Остальные данные подтянем
-          из ITMO ID на следующем шаге.
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="mt-8 flex flex-1 flex-col">
-        <div className="space-y-2">
-          <Label htmlFor="isu">Номер ИСУ</Label>
-          <Input
-            id="isu"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="Например, 412345"
-            value={isu}
-            aria-invalid={error != null}
-            onChange={(event) => {
-              setIsu(event.target.value)
-              if (error) setError(null)
-            }}
-          />
-          {error && <p className="text-sm text-danger-foreground">{error}</p>}
+    <div className="flex min-h-svh w-full items-center justify-center bg-background px-4 py-8">
+      <div className="w-full max-w-sm rounded-3xl bg-card p-6 shadow-xl">
+        <div className="flex flex-col items-center text-center">
+          <BrandMark className="size-16 rounded-2xl" />
+          <h1 className="mt-4 text-2xl font-bold text-foreground">Вход</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Введите номер ИСУ, чтобы войти. При первом входе создадим аккаунт,
+            данные подтянем из ITMO ID.
+          </p>
         </div>
 
-        <Button
-          type="submit"
-          size="lg"
-          className="mt-auto w-full"
-          disabled={submitting}
-        >
-          {submitting && <Spinner className="size-4 text-primary-foreground" />}
-          Продолжить
-        </Button>
-      </form>
-    </AppScreen>
+        <form onSubmit={handleSubmit} className="mt-6 space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="isu" className="px-1">
+              Номер ИСУ
+            </Label>
+            <Input
+              id="isu"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="Например, 412345"
+              value={isu}
+              aria-invalid={error != null}
+              onChange={(event) => {
+                setIsu(event.target.value)
+                if (error) setError(null)
+              }}
+            />
+            {error && <p className="px-1 text-sm text-danger-foreground">{error}</p>}
+          </div>
+
+          <Button
+            type="submit"
+            size="lg"
+            className="h-12 w-full rounded-xl"
+            disabled={submitting}
+          >
+            {submitting && <Spinner className="size-4 text-primary-foreground" />}
+            Войти
+          </Button>
+        </form>
+      </div>
+    </div>
   )
 }

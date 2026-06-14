@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft, LogOut, ShieldCheck } from 'lucide-react'
+import { LogOut, ShieldCheck } from 'lucide-react'
 
 import { AppScreen } from '@/components/AppScreen'
 import { Avatar } from '@/components/Avatar'
 import { Modal } from '@/components/Modal'
+import { ScreenHeader } from '@/components/ScreenHeader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -67,17 +68,7 @@ export function ProfileScreen({
 
   return (
     <AppScreen>
-      <header className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Назад"
-          className="-ml-2 rounded-md p-1.5 text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="size-5" />
-        </button>
-        <h1 className="text-lg font-semibold text-foreground">Профиль</h1>
-      </header>
+      <ScreenHeader title="Профиль" onBack={onBack} />
 
       <div className="mt-4 flex flex-col items-center gap-3 text-center">
         <Avatar url={user.avatar_url} name={user.full_name} className="size-20" />
@@ -191,8 +182,8 @@ export function ProfileScreen({
       >
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Привязка номера ИСУ и ITMO ID будет сброшена — потребуется войти
-            заново. Статус верификации водителя сохранится.
+            Вы вернётесь к вводу номера ИСУ. Данные аккаунта сохранятся —
+            войдите снова с этим же ИСУ, чтобы вернуться.
           </p>
           <Button
             variant="destructive"

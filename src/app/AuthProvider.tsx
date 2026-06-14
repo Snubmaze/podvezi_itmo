@@ -9,13 +9,14 @@ import { AuthContext, type AuthState } from './auth-context'
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading' })
 
-  // Запускает авторизацию; setState только в async-колбэках (не синхронно),
+  // Проверяет текущую сессию; setState только в async-колбэках (не синхронно),
   // чтобы не вызывать каскадные рендеры из эффекта.
   const runAuth = useCallback((token: { cancelled: boolean }) => {
     authBackend
       .authenticate()
       .then((user) => {
-        if (!token.cancelled) setState({ status: 'ready', user })
+        if (token.cancelled) return
+        setState(user ? { status: 'ready', user } : { status: 'needs-isu' })
       })
       .catch((error: unknown) => {
         if (token.cancelled) return
@@ -33,21 +34,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [runAuth])
 
-  // Повторная авторизация из обработчика события (Splash → «Повторить»).
+  // Повторная проверка из обработчика события (Splash → «Повторить»).
   const retry = useCallback(() => {
     setState({ status: 'loading' })
     runAuth({ cancelled: false })
   }, [runAuth])
 
+  // Вход по ИСУ (экран ввода ИСУ).
+  const loginWithIsu = useCallback(async (isu: string) => {
+    const user = await authBackend.loginWithIsu(isu)
+    setState({ status: 'ready', user })
+  }, [])
+
   const applyPatch = useCallback(async (patch: Partial<User>) => {
     const updated = await authBackend.updateProfile(patch)
     setState({ status: 'ready', user: updated })
   }, [])
-
-  const setIsuNumber = useCallback(
-    (isuNumber: string) => applyPatch({ isu_number: isuNumber }),
-    [applyPatch],
-  )
 
   const linkItmoId = useCallback(
     (profile: ItmoIdProfile) =>
@@ -66,39 +68,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applyPatch],
   )
 
-  // Перечитать профиль без флажка loading (после изменений вне updateProfile,
-  // напр. подачи заявки на верификацию через services/driver.ts).
+  // Перечитать профиль без флага loading (после изменений вне updateProfile).
   const reloadUser = useCallback(async () => {
     const user = await authBackend.authenticate()
-    setState({ status: 'ready', user })
+    setState(user ? { status: 'ready', user } : { status: 'needs-isu' })
   }, [])
 
-  // Выход = отвязка: сбрасываем привязку ИСУ + ITMO ID (статус водителя и роль
-  // не трогаем — их меняет только админ) и заново запускаем онбординг.
+  // Выход: завершить сессию (данные аккаунта сохраняются) → ввод ИСУ.
   const logout = useCallback(async () => {
-    try {
-      await authBackend.updateProfile({
-        isu_number: null,
-        itmo_id_linked: false,
-        full_name: null,
-        course: null,
-        age: null,
-        avatar_url: null,
-      })
-    } catch {
-      // даже если сброс полей не удался — всё равно завершаем сессию
-    }
-    await authBackend.signOut()
-    setState({ status: 'loading' })
-    runAuth({ cancelled: false })
-  }, [runAuth])
+    await authBackend.logout()
+    setState({ status: 'needs-isu' })
+  }, [])
 
   return (
     <AuthContext.Provider
       value={{
         state,
         retry,
-        setIsuNumber,
+        loginWithIsu,
         linkItmoId,
         updateDescription,
         reloadUser,
