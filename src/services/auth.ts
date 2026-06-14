@@ -1,31 +1,42 @@
 /**
- * Доменный сервис авторизации/профиля. Аккаунт = номер ИСУ (см.
- * architecture.md 5.1): вход по ИСУ, смена ИСУ = смена аккаунта.
+ * Доменный сервис авторизации/профиля. Аккаунт = логин ITMO ID (см.
+ * architecture.md 5.1): вход через ITMO ID (логин+пароль), смена логина =
+ * смена аккаунта. Номер ИСУ генерируется случайно один раз при создании
+ * аккаунта и сохраняется как атрибут (не вводится вручную).
  *
  * UI и хуки работают ТОЛЬКО через интерфейс `AuthBackend`. В Telegram —
- * Supabase-реализация (Edge Function `telegram-auth` ключит по ИСУ), в
- * браузере (дев/демо) — мок (аккаунты в localStorage по ИСУ).
+ * Supabase-реализация (Edge Function `telegram-auth` ключит по логину), в
+ * браузере (дев/демо) — мок (аккаунты в localStorage по логину).
  */
 
 import { supabase } from '@/lib/supabase'
 import { getInitDataRaw, isTelegramEnv } from '@/lib/telegram'
+import type { ItmoIdProfile } from '@/services/itmoId'
 import type { DriverVerificationStatus, User, UserRole } from '@/types/db'
 
 export interface AuthBackend {
-  /** Текущий аккаунт по активной сессии; null — сессии нет (нужен ввод ИСУ). */
+  /** Текущий аккаунт по активной сессии; null — сессии нет (нужен вход). */
   authenticate(): Promise<User | null>
-  /** Вход по номеру ИСУ (создаёт аккаунт при первом входе). */
-  loginWithIsu(isu: string): Promise<User>
-  /** Частичное обновление профиля (привязка ITMO ID, описание и т.п.). */
+  /**
+   * Вход через ITMO ID по логину (создаёт аккаунт при первом входе,
+   * генерирует ИСУ). `profile` — данные из мок ITMO ID, записываются в профиль.
+   */
+  loginWithItmoId(login: string, profile: ItmoIdProfile): Promise<User>
+  /** Частичное обновление профиля (описание и т.п.). */
   updateProfile(patch: Partial<User>): Promise<User>
   /** Выход: завершить сессию (данные аккаунта сохраняются). */
   logout(): Promise<void>
 }
 
-// --- Мок-реализация (аккаунты по ИСУ в localStorage) ---------------------
+/** Случайный 6-значный номер ИСУ (генерируется один раз при создании аккаунта). */
+export function generateIsuNumber(): string {
+  return String(100_000 + Math.floor(Math.random() * 900_000))
+}
+
+// --- Мок-реализация (аккаунты по логину ITMO ID в localStorage) ----------
 
 const MOCK_ACCOUNTS_KEY = 'podvezi.mock.accounts'
-const MOCK_CURRENT_KEY = 'podvezi.mock.currentIsu'
+const MOCK_CURRENT_KEY = 'podvezi.mock.currentLogin'
 
 function loadAccounts(): Record<string, User> {
   try {
@@ -40,7 +51,7 @@ function saveAccounts(accounts: Record<string, User>): void {
   localStorage.setItem(MOCK_ACCOUNTS_KEY, JSON.stringify(accounts))
 }
 
-function getCurrentIsu(): string | null {
+function getCurrentLogin(): string | null {
   try {
     return localStorage.getItem(MOCK_CURRENT_KEY)
   } catch {
@@ -48,46 +59,45 @@ function getCurrentIsu(): string | null {
   }
 }
 
-function setCurrentIsu(isu: string | null): void {
+function setCurrentLogin(login: string | null): void {
   try {
-    if (isu === null) localStorage.removeItem(MOCK_CURRENT_KEY)
-    else localStorage.setItem(MOCK_CURRENT_KEY, isu)
+    if (login === null) localStorage.removeItem(MOCK_CURRENT_KEY)
+    else localStorage.setItem(MOCK_CURRENT_KEY, login)
   } catch {
     // localStorage недоступен — игнорируем
   }
 }
 
-function createMockUser(isu: string): User {
+function createMockUser(profile: ItmoIdProfile): User {
   const now = new Date().toISOString()
   return {
     id: crypto.randomUUID(),
     telegram_id: 100_000_000 + Math.floor(Math.random() * 900_000_000),
     telegram_username: 'dev_user',
-    full_name: null,
-    isu_number: isu,
-    itmo_id_linked: false,
-    course: null,
-    age: null,
+    full_name: profile.full_name,
+    isu_number: generateIsuNumber(),
+    itmo_id_linked: true,
+    course: profile.course,
+    age: profile.age,
     description: null,
     role: 'passenger',
     driver_verification_status: 'none',
     phone: null,
-    avatar_url: null,
+    avatar_url: profile.avatar_url,
     created_at: now,
     updated_at: now,
   }
 }
 
 function loadCurrentMockUser(): User | null {
-  const isu = getCurrentIsu()
-  if (!isu) return null
-  return loadAccounts()[isu] ?? null
+  const login = getCurrentLogin()
+  if (!login) return null
+  return loadAccounts()[login] ?? null
 }
 
-function storeMockUser(user: User): void {
-  if (!user.isu_number) return
+function storeMockUser(login: string, user: User): void {
   const accounts = loadAccounts()
-  accounts[user.isu_number] = user
+  accounts[login] = user
   saveAccounts(accounts)
 }
 
@@ -102,40 +112,44 @@ function createMockAuthBackend(): AuthBackend {
       return loadCurrentMockUser()
     },
 
-    async loginWithIsu(isu) {
+    async loginWithItmoId(login, profile) {
       await delay(500)
       const accounts = loadAccounts()
-      const user = accounts[isu] ?? createMockUser(isu)
-      accounts[isu] = user
+      // Существующий аккаунт открываем как есть (сохранённый ИСУ/поездки/роль);
+      // новый — создаём со случайным ИСУ и данными ITMO ID.
+      const user = accounts[login] ?? createMockUser(profile)
+      accounts[login] = user
       saveAccounts(accounts)
-      setCurrentIsu(isu)
+      setCurrentLogin(login)
       return user
     },
 
     async updateProfile(patch) {
       await delay(200)
+      const login = getCurrentLogin()
       const current = loadCurrentMockUser()
-      if (!current) throw new Error('Нет активного аккаунта')
+      if (!login || !current) throw new Error('Нет активного аккаунта')
       const updated: User = {
         ...current,
         ...patch,
         updated_at: new Date().toISOString(),
       }
-      storeMockUser(updated)
+      storeMockUser(login, updated)
       return updated
     },
 
     async logout() {
-      setCurrentIsu(null)
+      setCurrentLogin(null)
     },
   }
 }
 
 /** DEV-only: подмена статуса верификации текущего мок-аккаунта. */
 export function devSetMockDriverStatus(status: DriverVerificationStatus): void {
+  const login = getCurrentLogin()
   const user = loadCurrentMockUser()
-  if (!user) return
-  storeMockUser({
+  if (!login || !user) return
+  storeMockUser(login, {
     ...user,
     driver_verification_status: status,
     updated_at: new Date().toISOString(),
@@ -144,9 +158,10 @@ export function devSetMockDriverStatus(status: DriverVerificationStatus): void {
 
 /** DEV-only: подмена роли текущего мок-аккаунта (для проверки админки). */
 export function devSetMockRole(role: UserRole): void {
+  const login = getCurrentLogin()
   const user = loadCurrentMockUser()
-  if (!user) return
-  storeMockUser({ ...user, role, updated_at: new Date().toISOString() })
+  if (!login || !user) return
+  storeMockUser(login, { ...user, role, updated_at: new Date().toISOString() })
 }
 
 // --- Supabase-реализация (Telegram) --------------------------------------
@@ -177,17 +192,17 @@ function createSupabaseAuthBackend(): AuthBackend {
       return loadProfile(session.user.id)
     },
 
-    async loginWithIsu(isu) {
+    async loginWithItmoId(login, profile) {
       const initDataRaw = getInitDataRaw()
       if (!initDataRaw) {
         throw new Error('Откройте приложение из Telegram')
       }
       const { data, error } = await supabase.functions.invoke<TelegramAuthResponse>(
         'telegram-auth',
-        { body: { initDataRaw, isu } },
+        { body: { initDataRaw, login } },
       )
       if (error || !data) {
-        throw new Error('Не удалось войти. Проверьте номер ИСУ.')
+        throw new Error('Не удалось войти через ITMO ID. Попробуйте ещё раз.')
       }
       const { data: setData, error: setError } = await supabase.auth.setSession({
         access_token: data.access_token,
@@ -196,9 +211,21 @@ function createSupabaseAuthBackend(): AuthBackend {
       if (setError || !setData.session) {
         throw new Error('Не удалось установить сессию')
       }
-      const profile = await loadProfile(setData.session.user.id)
-      if (!profile) throw new Error('Не удалось загрузить профиль')
-      return profile
+      // Записываем профиль ITMO ID (ИСУ сгенерирован на сервере при создании).
+      const { data: updated, error: updateError } = await supabase
+        .from('users')
+        .update({
+          full_name: profile.full_name,
+          course: profile.course,
+          age: profile.age,
+          avatar_url: profile.avatar_url,
+          itmo_id_linked: true,
+        })
+        .eq('id', setData.session.user.id)
+        .select()
+        .single()
+      if (updateError || !updated) throw new Error('Не удалось загрузить профиль')
+      return updated as User
     },
 
     async updateProfile(patch) {

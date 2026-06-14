@@ -5,16 +5,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { useAuth } from '@/hooks/useAuth'
-import { fetchItmoIdProfile } from '@/services/itmoId'
 
 /**
- * Экран входа через ITMO ID (мок), оформлен под реальный экран ITMO ID.
- * Любые непустые логин/пароль = успех; профиль (ФИО, курс, возраст, аватар)
- * приходит из мок-сервиса и сохраняется в users (itmo_id_linked = true).
+ * Экран входа через ITMO ID (мок) — единственный экран входа (аккаунт = логин,
+ * см. architecture.md 5.1). Любые непустые логин/пароль = успех; профиль (ФИО,
+ * курс, возраст, аватар) приходит из мок-сервиса, номер ИСУ генерируется при
+ * создании аккаунта. Тот же логин → тот же аккаунт.
  * Соц-кнопки (VK/Яндекс) и «Забыли пароль?» — некликабельные заглушки.
  */
 export function ItmoIdLoginScreen() {
-  const { linkItmoId } = useAuth()
+  const { loginWithItmoId } = useAuth()
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -33,11 +33,14 @@ export function ItmoIdLoginScreen() {
     setFormError(null)
     setSubmitting(true)
     try {
-      const profile = await fetchItmoIdProfile(login, password)
-      await linkItmoId(profile)
+      await loginWithItmoId(login, password)
       // Флоу переключится на главный экран.
-    } catch {
-      setFormError('Не удалось войти через ITMO ID. Попробуйте ещё раз.')
+    } catch (err) {
+      setFormError(
+        err instanceof Error
+          ? err.message
+          : 'Не удалось войти через ITMO ID. Попробуйте ещё раз.',
+      )
       setSubmitting(false)
     }
   }

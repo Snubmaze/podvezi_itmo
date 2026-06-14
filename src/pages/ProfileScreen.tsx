@@ -182,8 +182,8 @@ export function ProfileScreen({
       >
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Вы вернётесь к вводу номера ИСУ. Данные аккаунта сохранятся —
-            войдите снова с этим же ИСУ, чтобы вернуться.
+            Вы вернётесь к экрану входа ITMO ID. Данные аккаунта сохранятся —
+            войдите снова с тем же логином, чтобы вернуться.
           </p>
           <Button
             variant="destructive"

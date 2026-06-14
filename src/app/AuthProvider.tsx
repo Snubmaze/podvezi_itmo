@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
 import { authBackend } from '@/services/auth'
-import type { ItmoIdProfile } from '@/services/itmoId'
+import { fetchItmoIdProfile } from '@/services/itmoId'
 import type { User } from '@/types/db'
 
 import { AuthContext, type AuthState } from './auth-context'
@@ -16,7 +16,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .authenticate()
       .then((user) => {
         if (token.cancelled) return
-        setState(user ? { status: 'ready', user } : { status: 'needs-isu' })
+        setState(user ? { status: 'ready', user } : { status: 'needs-login' })
       })
       .catch((error: unknown) => {
         if (token.cancelled) return
@@ -40,9 +40,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     runAuth({ cancelled: false })
   }, [runAuth])
 
-  // Вход по ИСУ (экран ввода ИСУ).
-  const loginWithIsu = useCallback(async (isu: string) => {
-    const user = await authBackend.loginWithIsu(isu)
+  // Вход через ITMO ID: мок-профиль по логину + создание/открытие аккаунта.
+  const loginWithItmoId = useCallback(async (login: string, password: string) => {
+    const profile = await fetchItmoIdProfile(login, password)
+    const user = await authBackend.loginWithItmoId(login.trim(), profile)
     setState({ status: 'ready', user })
   }, [])
 
@@ -50,18 +51,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const updated = await authBackend.updateProfile(patch)
     setState({ status: 'ready', user: updated })
   }, [])
-
-  const linkItmoId = useCallback(
-    (profile: ItmoIdProfile) =>
-      applyPatch({
-        full_name: profile.full_name,
-        course: profile.course,
-        age: profile.age,
-        avatar_url: profile.avatar_url,
-        itmo_id_linked: true,
-      }),
-    [applyPatch],
-  )
 
   const updateDescription = useCallback(
     (description: string) => applyPatch({ description }),
@@ -71,13 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Перечитать профиль без флага loading (после изменений вне updateProfile).
   const reloadUser = useCallback(async () => {
     const user = await authBackend.authenticate()
-    setState(user ? { status: 'ready', user } : { status: 'needs-isu' })
+    setState(user ? { status: 'ready', user } : { status: 'needs-login' })
   }, [])
 
-  // Выход: завершить сессию (данные аккаунта сохраняются) → ввод ИСУ.
+  // Выход: завершить сессию (данные аккаунта сохраняются) → вход ITMO ID.
   const logout = useCallback(async () => {
     await authBackend.logout()
-    setState({ status: 'needs-isu' })
+    setState({ status: 'needs-login' })
   }, [])
 
   return (
@@ -85,8 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         state,
         retry,
-        loginWithIsu,
-        linkItmoId,
+        loginWithItmoId,
         updateDescription,
         reloadUser,
         logout,

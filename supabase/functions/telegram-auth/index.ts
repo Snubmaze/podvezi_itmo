@@ -1,8 +1,9 @@
 // Edge Function: telegram-auth
 // Проверяет подпись Telegram initData (HMAC-SHA256 по bot-token) для
-// безопасности, затем по номеру ИСУ находит/создаёт пользователя в auth.users
-// (детерминированный email/пароль по ИСУ), гарантирует строку в public.users
-// и возвращает клиенту Supabase-сессию. Аккаунт = ИСУ (см. architecture.md §5.1).
+// безопасности, затем по логину ITMO ID находит/создаёт пользователя в
+// auth.users (детерминированный email/пароль по логину), гарантирует строку
+// в public.users (со случайным ИСУ при создании) и возвращает клиенту
+// Supabase-сессию. Аккаунт = логин ITMO ID (см. architecture.md §5.1).
 //
 // verify_jwt = false (на момент вызова сессии ещё нет).
 // Секреты: TELEGRAM_BOT_TOKEN, AUTH_USER_SECRET.
@@ -17,7 +18,6 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const ISU_PATTERN = /^\d{4,10}$/
 const encoder = new TextEncoder()
 
 /** HMAC-SHA256, возвращает сырые байты. */
@@ -99,20 +99,20 @@ Deno.serve(async (req) => {
   }
 
   let initDataRaw: string | undefined
-  let isu: string | undefined
+  let login: string | undefined
   try {
-    const body = (await req.json()) as { initDataRaw?: string; isu?: string }
+    const body = (await req.json()) as { initDataRaw?: string; login?: string }
     initDataRaw = body.initDataRaw
-    isu = body.isu?.trim()
+    login = body.login?.trim()
   } catch {
     return json({ error: 'Invalid body' }, 400)
   }
   if (!initDataRaw) return json({ error: 'initDataRaw is required' }, 400)
-  if (!isu || !ISU_PATTERN.test(isu)) {
-    return json({ error: 'Некорректный номер ИСУ' }, 400)
+  if (!login) {
+    return json({ error: 'Не указан логин ITMO ID' }, 400)
   }
 
-  // Telegram-подпись — только проверка безопасности (личность определяет ИСУ).
+  // Telegram-подпись — только проверка безопасности (личность определяет логин).
   const tgUser = await verifyInitData(initDataRaw, botToken)
   if (!tgUser) return json({ error: 'Invalid init data' }, 401)
 
@@ -120,23 +120,17 @@ Deno.serve(async (req) => {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  // Был ли уже аккаунт с этим ИСУ (для is_new_user).
-  const { data: existing } = await admin
-    .from('users')
-    .select('id')
-    .eq('isu_number', isu)
-    .maybeSingle()
-
-  // Детерминированные учётные данные auth.users по ИСУ.
-  const email = `isu${isu}@itmo.podvezi.local`
-  const password = toHex(await hmac(encoder.encode(authSecret), isu))
+  // Детерминированные учётные данные auth.users по логину ITMO ID
+  // (сам логин в БД не хранится — он закодирован в email auth-юзера).
+  const loginKey = toHex(await hmac(encoder.encode(authSecret), `login:${login}`))
+  const email = `itmo${loginKey.slice(0, 32)}@itmo.podvezi.local`
+  const password = toHex(await hmac(encoder.encode(authSecret), `pw:${login}`))
 
   // Создаём auth-пользователя (если уже есть — игнорируем ошибку).
   await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    user_metadata: { isu_number: isu },
   })
 
   // Логинимся, чтобы получить сессию (access/refresh).
@@ -151,7 +145,31 @@ Deno.serve(async (req) => {
     return json({ error: 'Sign-in failed' }, 500)
   }
 
-  // Гарантируем строку в public.users (ключ — isu_number; telegram_id — метаданные).
+  // Уже существующий профиль? (тогда сохраняем его ИСУ; иначе генерируем).
+  const { data: existing } = await admin
+    .from('users')
+    .select('isu_number')
+    .eq('id', signIn.user.id)
+    .maybeSingle()
+
+  let isu = existing?.isu_number ?? null
+  const isNewUser = !isu
+  if (!isu) {
+    // Случайный уникальный 6-значный ИСУ (несколько попыток против коллизий).
+    for (let attempt = 0; attempt < 5 && !isu; attempt += 1) {
+      const candidate = String(100_000 + Math.floor(Math.random() * 900_000))
+      const { data: clash } = await admin
+        .from('users')
+        .select('id')
+        .eq('isu_number', candidate)
+        .maybeSingle()
+      if (!clash) isu = candidate
+    }
+    if (!isu) return json({ error: 'Не удалось сгенерировать ИСУ' }, 500)
+  }
+
+  // Гарантируем строку в public.users (ключ аккаунта — логин; telegram_id и
+  // isu_number — атрибуты). Профиль ITMO ID клиент допишет через updateProfile.
   const { error: upsertErr } = await admin.from('users').upsert(
     {
       id: signIn.user.id,
@@ -166,6 +184,6 @@ Deno.serve(async (req) => {
   return json({
     access_token: signIn.session.access_token,
     refresh_token: signIn.session.refresh_token,
-    is_new_user: !existing,
+    is_new_user: isNewUser,
   })
 })
