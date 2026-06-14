@@ -240,7 +240,7 @@ JWT-сессия Supabase, доступ к данным только через 
 | `document_status` | `pending` \| `approved` \| `rejected` | `driver_documents.status` |
 | `moderation_type` | `driver_verification` | `moderation_requests.type` |
 | `moderation_status` | `pending` \| `approved` \| `rejected` | `moderation_requests.status` |
-| `trip_status` | `active` \| `in_progress` \| `completed` \| `cancelled` | `trips.status` (жизненный цикл: `active`→`in_progress`→`completed`; `cancelled` из `active`/`in_progress`; статус виден всем) |
+| `trip_status` | `active` \| `in_progress` \| `completed` \| `cancelled` | `trips.status` (жизненный цикл: `active`→`in_progress`→`completed`; `cancelled` только из `active` — отменить можно лишь до старта; статус виден всем) |
 | `trip_member_role` | `driver` \| `passenger` | `trip_members.role_in_trip` |
 | `trip_member_status` | `confirmed` \| `cancelled` \| `completed` \| `no_show` | `trip_members.status` |
 | `trip_request_status` | `pending` \| `accepted` \| `rejected` \| `cancelled` | `trip_requests.status` |
@@ -540,7 +540,7 @@ grant select on public.vehicle_public_info to authenticated;
 | `acceptTripRequest` | `(requestId: string) => Promise<void>` | RPC `accept_trip_request` — атомарно принимает заявку, создаёт `trip_members`, уменьшает `seats_available`. |
 | `rejectTripRequest` | `(requestId: string) => Promise<void>` | `UPDATE trip_requests SET status='rejected' WHERE id=... AND status='pending'`. |
 | `cancelTripRequest` | `(requestId: string) => Promise<void>` | `DELETE FROM trip_requests WHERE id=... AND status='pending'` (отмена своей заявки пассажиром). |
-| `updateTripStatus` | `(tripId: string, status: TripStatus) => Promise<void>` | Меняет `trips.status` (водитель/админ — гарантирует RLS). Переходы валидируются `canTransitionTrip` на клиенте: `active`→`in_progress`→`completed`, отмена из `active`/`in_progress`. Статус виден всем (SELECT `trips` открыт). |
+| `updateTripStatus` | `(tripId: string, status: TripStatus) => Promise<void>` | Меняет `trips.status` (водитель/админ — гарантирует RLS). Переходы валидируются `canTransitionTrip` на клиенте: `active`→`in_progress`→`completed`, отмена только из `active` (до старта). Статус виден всем (SELECT `trips` открыт). |
 | `canTransitionTrip` | `(from: TripStatus, to: TripStatus) => boolean` | Допустим ли переход статуса поездки (карта `TRIP_STATUS_TRANSITIONS`). |
 | `getCoTravelerContact` | `(userId: string) => Promise<CoTravelerContact \| null>` | RPC `get_co_traveler_contact` — профиль с контактами, доступен только подтверждённому попутчику (ТЗ 5.5.1); иначе `null`. |
 | `getPublicProfile` | `(userId: string) => Promise<UserPublicProfile \| null>` | Одиночный публичный профиль из вью `user_public_profiles` (без контактов) — фолбэк для экрана профиля водителя, когда контакты недоступны. |

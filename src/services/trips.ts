@@ -358,7 +358,7 @@ export async function cancelTripRequest(requestId: string): Promise<void> {
 /** Допустимые переходы статуса поездки (управляет водитель; см. architecture.md 5.2.2). */
 const TRIP_STATUS_TRANSITIONS: Record<TripStatus, TripStatus[]> = {
   active: ['in_progress', 'cancelled'],
-  in_progress: ['completed', 'cancelled'],
+  in_progress: ['completed'], // отменить можно только до старта (из active)
   completed: [],
   cancelled: [],
 }
