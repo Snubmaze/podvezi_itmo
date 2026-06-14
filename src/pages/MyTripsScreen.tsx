@@ -11,9 +11,26 @@ import { useMyDriverTrips } from '@/hooks/useMyDriverTrips'
 import { useMyPassengerTrips } from '@/hooks/useMyPassengerTrips'
 import { tripRequestStatusBadge } from '@/lib/tripRequestStatus'
 import { tripStatusBadge } from '@/lib/tripStatus'
-import { acceptTripRequest, cancelTripRequest, rejectTripRequest } from '@/services/trips'
-import type { User } from '@/types/db'
+import {
+  acceptTripRequest,
+  canTransitionTrip,
+  cancelTripRequest,
+  rejectTripRequest,
+  updateTripStatus,
+} from '@/services/trips'
+import type { TripStatus, User } from '@/types/db'
 import type { DriverTripWithDetails, TripRequestWithTrip } from '@/types/trips'
+
+/** Кнопки перехода статуса поездки (видимы водителю): лейбл + стиль для целевого статуса. */
+const STATUS_ACTIONS: Array<{
+  to: TripStatus
+  label: string
+  variant: 'default' | 'outline' | 'destructive'
+}> = [
+  { to: 'in_progress', label: 'Начать поездку', variant: 'default' },
+  { to: 'completed', label: 'Завершить', variant: 'default' },
+  { to: 'cancelled', label: 'Отменить поездку', variant: 'destructive' },
+]
 
 /** Карточка поездки водителя с заявками и подтверждёнными пассажирами. */
 function DriverTripCard({
@@ -43,10 +60,47 @@ function DriverTripCard({
   }
 
   const badge = tripStatusBadge(trip.status)
+  const [statusPending, setStatusPending] = useState(false)
+  const [statusError, setStatusError] = useState<string | null>(null)
+
+  const changeStatus = async (to: TripStatus) => {
+    setStatusPending(true)
+    setStatusError(null)
+    try {
+      await updateTripStatus(trip.id, to)
+      onActed()
+    } catch (err) {
+      setStatusError(err instanceof Error ? err.message : 'Не удалось изменить статус')
+    } finally {
+      setStatusPending(false)
+    }
+  }
+
+  const statusActions = STATUS_ACTIONS.filter((a) => canTransitionTrip(trip.status, a.to))
 
   return (
     <div className="space-y-3">
       <TripCard trip={trip} badge={<Badge variant={badge.variant}>{badge.label}</Badge>} />
+
+      {statusActions.length > 0 && (
+        <div className="space-y-1.5 px-1">
+          <div className="flex flex-wrap gap-1.5">
+            {statusActions.map((action) => (
+              <Button
+                key={action.to}
+                size="sm"
+                variant={action.variant}
+                onClick={() => changeStatus(action.to)}
+                disabled={statusPending}
+              >
+                {statusPending && <Spinner className="size-4" />}
+                {action.label}
+              </Button>
+            ))}
+          </div>
+          {statusError && <p className="text-sm text-danger-foreground">{statusError}</p>}
+        </div>
+      )}
 
       <div className="space-y-2 px-1">
         <h3 className="text-sm font-semibold text-foreground">Заявки</h3>
@@ -160,6 +214,10 @@ function PassengerRequestCard({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const badge = tripRequestStatusBadge(request.status)
+  // Статус самой поездки (В пути / Завершена / Отменена) — показываем пассажиру,
+  // когда он отличается от «Активна» (значимое изменение от водителя).
+  const tripBadge =
+    request.trip.status !== 'active' ? tripStatusBadge(request.trip.status) : null
 
   const handleCancel = async () => {
     setSubmitting(true)
@@ -179,7 +237,12 @@ function PassengerRequestCard({
       trip={request.trip}
       showDriver
       onDriverClick={onOpenDriverProfile}
-      badge={<Badge variant={badge.variant}>{badge.label}</Badge>}
+      badge={
+        <div className="flex flex-wrap justify-end gap-1.5">
+          {tripBadge && <Badge variant={tripBadge.variant}>{tripBadge.label}</Badge>}
+          <Badge variant={badge.variant}>{badge.label}</Badge>
+        </div>
+      }
       footer={
         <div className="space-y-1.5">
           {request.status === 'pending' && (

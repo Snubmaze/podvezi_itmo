@@ -26,7 +26,7 @@ export type ModerationType = 'driver_verification'
 
 export type ModerationStatus = 'pending' | 'approved' | 'rejected'
 
-export type TripStatus = 'active' | 'completed' | 'cancelled'
+export type TripStatus = 'active' | 'in_progress' | 'completed' | 'cancelled'
 
 export type TripMemberRole = 'driver' | 'passenger'
 

@@ -12,6 +12,7 @@ import type {
   Trip,
   TripMember,
   TripRequest,
+  TripStatus,
   UserPublicProfile,
   VehiclePublicInfo,
 } from '@/types/db'
@@ -352,4 +353,27 @@ export async function cancelTripRequest(requestId: string): Promise<void> {
     .eq('status', 'pending')
 
   if (error) throw new Error('Не удалось отменить заявку')
+}
+
+/** Допустимые переходы статуса поездки (управляет водитель; см. architecture.md 5.2.2). */
+const TRIP_STATUS_TRANSITIONS: Record<TripStatus, TripStatus[]> = {
+  active: ['in_progress', 'cancelled'],
+  in_progress: ['completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+}
+
+/** Можно ли перевести поездку из `from` в `to`. */
+export function canTransitionTrip(from: TripStatus, to: TripStatus): boolean {
+  return TRIP_STATUS_TRANSITIONS[from].includes(to)
+}
+
+/**
+ * Меняет статус поездки (только водитель/админ — гарантирует RLS `trips`).
+ * Статус виден всем участникам. Переход валидируется по
+ * `TRIP_STATUS_TRANSITIONS` (на клиенте; авторизация — RLS).
+ */
+export async function updateTripStatus(tripId: string, status: TripStatus): Promise<void> {
+  const { error } = await supabase.from('trips').update({ status }).eq('id', tripId)
+  if (error) throw new Error('Не удалось изменить статус поездки')
 }

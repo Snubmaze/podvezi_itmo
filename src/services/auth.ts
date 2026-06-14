@@ -202,7 +202,22 @@ function createSupabaseAuthBackend(): AuthBackend {
         { body: { initDataRaw, login } },
       )
       if (error || !data) {
-        throw new Error('Не удалось войти через ITMO ID. Попробуйте ещё раз.')
+        // Пытаемся достать текст ошибки из тела ответа функции (для диагностики).
+        let detail = ''
+        const ctx = (error as { context?: Response })?.context
+        if (ctx && typeof ctx.json === 'function') {
+          try {
+            const body = (await ctx.json()) as { error?: string; detail?: string }
+            detail = body.detail || body.error || ''
+          } catch {
+            /* тело не JSON — игнорируем */
+          }
+        }
+        throw new Error(
+          detail
+            ? `Не удалось войти через ITMO ID: ${detail}`
+            : 'Не удалось войти через ITMO ID. Попробуйте ещё раз.',
+        )
       }
       const { data: setData, error: setError } = await supabase.auth.setSession({
         access_token: data.access_token,

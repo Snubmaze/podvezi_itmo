@@ -95,6 +95,10 @@ Deno.serve(async (req) => {
   const authSecret = Deno.env.get('AUTH_USER_SECRET')
 
   if (!botToken || !authSecret) {
+    console.error('[telegram-auth] missing secrets', {
+      hasBotToken: !!botToken,
+      hasAuthSecret: !!authSecret,
+    })
     return json({ error: 'Server is not configured' }, 500)
   }
 
@@ -104,7 +108,8 @@ Deno.serve(async (req) => {
     const body = (await req.json()) as { initDataRaw?: string; login?: string }
     initDataRaw = body.initDataRaw
     login = body.login?.trim()
-  } catch {
+  } catch (e) {
+    console.error('[telegram-auth] invalid body', e)
     return json({ error: 'Invalid body' }, 400)
   }
   if (!initDataRaw) return json({ error: 'initDataRaw is required' }, 400)
@@ -112,78 +117,99 @@ Deno.serve(async (req) => {
     return json({ error: 'Не указан логин ITMO ID' }, 400)
   }
 
-  // Telegram-подпись — только проверка безопасности (личность определяет логин).
-  const tgUser = await verifyInitData(initDataRaw, botToken)
-  if (!tgUser) return json({ error: 'Invalid init data' }, 401)
-
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-
-  // Детерминированные учётные данные auth.users по логину ITMO ID
-  // (сам логин в БД не хранится — он закодирован в email auth-юзера).
-  const loginKey = toHex(await hmac(encoder.encode(authSecret), `login:${login}`))
-  const email = `itmo${loginKey.slice(0, 32)}@itmo.podvezi.local`
-  const password = toHex(await hmac(encoder.encode(authSecret), `pw:${login}`))
-
-  // Создаём auth-пользователя (если уже есть — игнорируем ошибку).
-  await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  })
-
-  // Логинимся, чтобы получить сессию (access/refresh).
-  const anon = createClient(supabaseUrl, anonKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-  const { data: signIn, error: signErr } = await anon.auth.signInWithPassword({
-    email,
-    password,
-  })
-  if (signErr || !signIn.session) {
-    return json({ error: 'Sign-in failed' }, 500)
-  }
-
-  // Уже существующий профиль? (тогда сохраняем его ИСУ; иначе генерируем).
-  const { data: existing } = await admin
-    .from('users')
-    .select('isu_number')
-    .eq('id', signIn.user.id)
-    .maybeSingle()
-
-  let isu = existing?.isu_number ?? null
-  const isNewUser = !isu
-  if (!isu) {
-    // Случайный уникальный 6-значный ИСУ (несколько попыток против коллизий).
-    for (let attempt = 0; attempt < 5 && !isu; attempt += 1) {
-      const candidate = String(100_000 + Math.floor(Math.random() * 900_000))
-      const { data: clash } = await admin
-        .from('users')
-        .select('id')
-        .eq('isu_number', candidate)
-        .maybeSingle()
-      if (!clash) isu = candidate
+  try {
+    // Telegram-подпись — только проверка безопасности (личность определяет логин).
+    const tgUser = await verifyInitData(initDataRaw, botToken)
+    if (!tgUser) {
+      console.error('[telegram-auth] initData verification failed')
+      return json({ error: 'Invalid init data' }, 401)
     }
-    if (!isu) return json({ error: 'Не удалось сгенерировать ИСУ' }, 500)
+    console.log('[telegram-auth] start', { tgId: tgUser.id, login })
+
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+
+    // Детерминированные учётные данные auth.users по логину ITMO ID
+    // (сам логин в БД не хранится — он закодирован в email auth-юзера).
+    const loginKey = toHex(await hmac(encoder.encode(authSecret), `login:${login}`))
+    const email = `itmo${loginKey.slice(0, 32)}@itmo.podvezi.local`
+    const password = toHex(await hmac(encoder.encode(authSecret), `pw:${login}`))
+
+    // Создаём auth-пользователя (если уже есть — игнорируем «already registered»).
+    const { error: createErr } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    })
+    if (createErr) {
+      console.log('[telegram-auth] createUser note', createErr.message)
+    }
+
+    // Логинимся, чтобы получить сессию (access/refresh).
+    const anon = createClient(supabaseUrl, anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+    const { data: signIn, error: signErr } = await anon.auth.signInWithPassword({
+      email,
+      password,
+    })
+    if (signErr || !signIn.session) {
+      console.error('[telegram-auth] sign-in failed', signErr?.message)
+      return json({ error: 'Sign-in failed' }, 500)
+    }
+
+    // Уже существующий профиль? (тогда сохраняем его ИСУ; иначе генерируем).
+    const { data: existing, error: selErr } = await admin
+      .from('users')
+      .select('isu_number')
+      .eq('id', signIn.user.id)
+      .maybeSingle()
+    if (selErr) console.error('[telegram-auth] select users error', selErr.message)
+
+    let isu = existing?.isu_number ?? null
+    const isNewUser = !isu
+    if (!isu) {
+      // Случайный уникальный 6-значный ИСУ (несколько попыток против коллизий).
+      for (let attempt = 0; attempt < 5 && !isu; attempt += 1) {
+        const candidate = String(100_000 + Math.floor(Math.random() * 900_000))
+        const { data: clash } = await admin
+          .from('users')
+          .select('id')
+          .eq('isu_number', candidate)
+          .maybeSingle()
+        if (!clash) isu = candidate
+      }
+      if (!isu) return json({ error: 'Не удалось сгенерировать ИСУ' }, 500)
+    }
+
+    // Гарантируем строку в public.users (ключ аккаунта — логин; telegram_id и
+    // isu_number — атрибуты). Профиль ITMO ID клиент допишет через updateProfile.
+    const { error: upsertErr } = await admin.from('users').upsert(
+      {
+        id: signIn.user.id,
+        isu_number: isu,
+        telegram_id: tgUser.id,
+        telegram_username: tgUser.username ?? null,
+      },
+      { onConflict: 'id' },
+    )
+    if (upsertErr) {
+      console.error('[telegram-auth] upsert failed', upsertErr.message, upsertErr)
+      return json({ error: 'Profile upsert failed', detail: upsertErr.message }, 500)
+    }
+
+    console.log('[telegram-auth] success', { userId: signIn.user.id, isNewUser })
+    return json({
+      access_token: signIn.session.access_token,
+      refresh_token: signIn.session.refresh_token,
+      is_new_user: isNewUser,
+    })
+  } catch (e) {
+    console.error('[telegram-auth] unexpected error', e)
+    return json(
+      { error: 'Unexpected error', detail: e instanceof Error ? e.message : String(e) },
+      500,
+    )
   }
-
-  // Гарантируем строку в public.users (ключ аккаунта — логин; telegram_id и
-  // isu_number — атрибуты). Профиль ITMO ID клиент допишет через updateProfile.
-  const { error: upsertErr } = await admin.from('users').upsert(
-    {
-      id: signIn.user.id,
-      isu_number: isu,
-      telegram_id: tgUser.id,
-      telegram_username: tgUser.username ?? null,
-    },
-    { onConflict: 'id' },
-  )
-  if (upsertErr) return json({ error: 'Profile upsert failed' }, 500)
-
-  return json({
-    access_token: signIn.session.access_token,
-    refresh_token: signIn.session.refresh_token,
-    is_new_user: isNewUser,
-  })
 })
